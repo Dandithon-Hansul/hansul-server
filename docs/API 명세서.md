@@ -105,7 +105,7 @@ Response 200:
   }
 ```
 
-> 필드는 단계별로 일부만 보내도 된다.
+> PATCH는 기존 프로필의 일부 필드를 수정한다. 최초 생성과 역할 설정은 POST /api/profiles/setup에서 처리한다. 프로필이 없으면 404를 반환한다. 대구·경북 시군구 코드를 수정할 수 있고, avatar_url은 HTTPS URL 또는 null이다. GET의 지역 정보는 현재 저장된 시군구 단위이며 dong은 null이다.
 >
 
 ---
@@ -637,6 +637,8 @@ Response 200:
 
 ## 10-1. 내가 전승한 레시피 목록
 
+> 본인이 발행한 레시피를 최신순으로 반환한다. cursor는 이전 응답의 next_cursor를 그대로 사용한다. limit 기본값은 20, 최대 50이다.
+
 ```
 GET /api/profiles/me/recipes?cursor=&limit=20
 Authorization: Bearer <access_token>
@@ -660,6 +662,8 @@ Response 200:
 ---
 
 ## 10-2. 저장한 레시피 목록
+
+> 본인이 저장한 공개 발행 레시피를 최근 저장순으로 반환한다. cursor와 limit 규약은 전승 목록과 같다.
 
 ```
 GET /api/profiles/me/saved?cursor=&limit=20
