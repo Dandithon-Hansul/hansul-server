@@ -507,15 +507,18 @@ Authorization: Bearer <access_token>
 Response 200:
   {
     recipe_id:         UUID,
-    title:             string,
+    title:             string | null,
     hero_image_url:    string | null,
+    transmitter_id:    UUID,
     transmitter_name:  string,
+    region:            string | null,
+    region_code:       string | null,
     transmitter_quote: string,
     context_summary:   string,
     voice_message_url: string | null,
-    cooking_time:      number,             // 분 단위
-    difficulty:        "쉬움" | "보통" | "어려움",
-    servings:          number,
+    cooking_time:      number | null,             // 분 단위
+    difficulty:        "쉬움" | "보통" | "어려움" | null,
+    servings:          number | null,
     like_count:        number,
     save_count:        number,
     is_liked:          boolean,
@@ -538,9 +541,13 @@ Response 200:
   }
 
 Error:
+  400  잘못된 UUID
+  401  인증 필요
   404  레시피 없음
   403  비공개 레시피에 접근 권한 없음
 ```
+
+> S-05와 S-06은 같은 응답을 사용한다. 단계는 order 오름차순이며 실제 사진이 있으면 해당 단계의 image_url에 우선 반환한다.
 
 > 탐색·검색·지도에는 `status=published` 및 `visibility=public`인 레시피만 노출한다. 원본 음성, 전체 transcript, 내부 감각 사전과 조리 평가 기록은 응답에서 제외한다.
 >
@@ -564,8 +571,18 @@ Response 200:
   }
 ```
 
-> 동일 요청을 반복하면 토글된다 (좋아요 → 좋아요 취소).
+> 공개 발행 레시피에만 적용하며 요청 본문은 필요 없다. 동일 요청을 반복하면 해당 상태가 반전된다. 응답에는 두 상태와 최신 집계가 함께 들어 있다. 인증 실패는 401, 레시피 없음은 404, 비공개·초안 또는 프로필 미설정은 403이다.
 >
+
+---
+
+## 8-2. 레시피 작성자 프로필
+
+S-05 상세의 transmitter_id로 GET /api/profiles/:id를 호출한다. Supabase Bearer 인증이 필요하다.
+
+응답 필드는 profile_id, display_name, avatar_url, region, bio, recipe_count, received_like_count, recipes다. avatar_url, region, bio는 null일 수 있다. recipes는 최신 공개 발행 레시피 최대 30개이며 각 항목은 recipe_id, title, hero_image_url을 포함한다. 집계는 공개 발행 레시피 전체를 기준으로 한다.
+
+잘못된 ID는 400, 인증 실패는 401, 전승자 프로필이 없으면 404를 반환한다.
 
 ---
 

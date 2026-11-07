@@ -120,6 +120,7 @@ CREATE TABLE profiles (
   region              TEXT,
   region_code         TEXT,
   avatar_url          TEXT,
+  bio                 TEXT,
   food_preferences    JSONB NOT NULL DEFAULT '[]'::jsonb,
   sensory_vector      vector(1536),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
