@@ -605,8 +605,8 @@ GET /api/map/regions
 Response 200:
   {
     regions: [
-      { region_code: "47170", region: "안동시", recipe_count: 12 },
-      { region_code: "47130", region: "경주시", recipe_count: 8 }
+      { region_code: "47170", region: "안동시", sido: "경북", recipe_count: 12 },
+      { region_code: "47130", region: "경주시", sido: "경북", recipe_count: 8 }
     ]
   }
 ```
@@ -616,7 +616,9 @@ GET /api/map/regions/:region_code/recipes?limit=10
 
 Response 200:
   {
+    region_code: "47170",
     region: "안동시",
+    sido: "경북",
     recipes: [
       {
         recipe_id:        UUID,
@@ -629,6 +631,8 @@ Response 200:
     ]
   }
 ```
+
+> 지도 조회 API는 공개 발행 레시피만 집계·반환하며, 0건 지역도 regions에 포함한다. 인기 순서는 좋아요 수 내림차순, 생성 시각 내림차순, ID 오름차순이다. limit 기본값은 10이며 1~50을 허용한다. 잘못된 입력은 400, 미지원 지역 코드는 404다.
 
 > 프론트엔드는 공공데이터포털 GeoJSON(정적 번들)으로 폴리곤을 렌더링하고 Kakao Maps 베이스 맵 위에 오버레이한다. 핀을 누르면 해당 지역 인기 레시피 목록이 바텀 시트에 표시된다. MVP는 대구·경북을 제공하고 동일한 행정구역 코드 구조로 전국 확장이 가능해야 한다.
 >
