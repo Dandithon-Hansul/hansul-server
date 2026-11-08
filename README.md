@@ -3,16 +3,31 @@
 > 대구·경북의 향토음식과 가정에서 전해 내려오는 조리법을 AI 음성 대화로 기록하고,  
 > 누구나 쉽게 찾아보고 따라 만들 수 있도록 돕는 지역 식문화 전승 서비스
 
+<div align="center">
+
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%2B%20Storage%20%2B%20Auth-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![Supabase](https://img.shields.io/badge/Supabase-Database%20%C2%B7%20Auth%20%C2%B7%20Storage-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com)
 [![Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel)](https://hansul-server.vercel.app)
 [![Claude](https://img.shields.io/badge/Claude-Sonnet%204.6-D97706?logo=anthropic&logoColor=white)](https://anthropic.com)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
+</div>
+
 ---
 
-## 배포 환경
+## 목차
+
+- [배포 환경](#배포-환경)
+- [서비스 개요](#서비스-개요)
+- [기술 스택](#기술-스택)
+- [로컬 실행](#로컬-실행)
+- [환경변수](#환경변수)
+- [프로젝트 구조](#프로젝트-구조)
+
+---
+
+## 🚀 배포 환경
 
 | 환경 | URL |
 |------|-----|
@@ -22,7 +37,7 @@
 
 ---
 
-## 서비스 개요
+## 📖 서비스 개요
 
 대구·경북에는 지역 고유의 향토음식과 종가·노포에서 오랫동안 이어져 온 조리법이 있습니다. '쪼매', '적당히', '한 움큼'처럼 감각으로 전해지는 표현은 글로 옮기기 어렵고, 기록되지 않으면 사라질 수 있습니다.
 
@@ -30,18 +45,33 @@
 
 ### 핵심 기능
 
-| 기능 | 설명 |
-|------|------|
-| 🎙️ **음성 레시피 기록** | 말하면 AI가 감각어를 탐지하고 추가 질문으로 구조화된 레시피를 완성 |
-| 🤖 **AI 채팅 인터뷰** | 텍스트·음성·사진 복합 입력, 응답은 텍스트·TTS 동시 스트리밍 |
-| 🗺️ **지역 레시피 지도** | 대구·경북 폴리곤 지도에서 지역 클릭 시 인기 레시피 바텀 시트 |
-| 🧠 **손맛 프로파일** | 감각어 답변을 벡터화해 2회차부터 자동 반영, 불일치 시만 재질문 |
-| 🖼️ **단계별 AI 이미지** | DALL-E 3로 중간 조리 단계 이미지 일괄 생성·재생성 |
-| 👤 **전승자 프로필** | 아바타 업로드, 지역·음식 취향 설정, 전승 레시피 통계 |
+#### 🎙️ 음성 레시피 기록
+
+말로 조리법을 설명하면, AI가 '쪼매', '적당히', '한 움큼'처럼 감각으로 표현된 말을 감지해 "양파 반 개 분량인가요?" 같은 추가 질문을 이어갑니다. 대화가 끝나면 재료·분량·순서가 정리된 구조화된 레시피가 완성됩니다.
+
+#### 🤖 AI 채팅 인터뷰
+
+텍스트, 음성 녹음, 사진을 함께 사용할 수 있는 복합 입력 방식의 인터뷰입니다. AI 응답은 텍스트와 음성(TTS)으로 동시에 스트리밍되어, 화면을 보거나 소리로 들으며 대화하듯 기록할 수 있습니다.
+
+#### 🗺️ 지역 레시피 지도
+
+대구·경북 지역을 폴리곤으로 그린 지도에서 원하는 지역을 클릭하면 그 동네의 인기 레시피 목록이 바텀 시트로 펼쳐집니다. 지역별 향토음식을 지도 위에서 직관적으로 탐색할 수 있습니다.
+
+#### 🧠 손맛 프로파일
+
+기록할 때마다 감각어 답변을 벡터로 저장해 나만의 손맛 프로파일을 만들어 갑니다. 2회차 기록부터는 이전 답변을 자동으로 반영하고, 이전과 다른 표현이 나왔을 때만 다시 물어보므로 반복 질문이 줄어듭니다.
+
+#### 🖼️ 단계별 AI 이미지
+
+레시피의 중간 조리 단계마다 DALL-E 3로 이미지를 자동 생성합니다. 완성본이 마음에 들지 않으면 개별 단계 이미지를 재생성할 수 있어, 완성도 높은 레시피 카드를 만들 수 있습니다.
+
+#### 👤 전승자 프로필
+
+아바타 이미지 업로드, 활동 지역·음식 취향 설정, 그리고 지금까지 전승한 레시피 수·받은 좋아요 수 등 통계를 한눈에 볼 수 있는 프로필 페이지입니다.
 
 ---
 
-## 기술 스택
+## 🛠️ 기술 스택
 
 | 영역 | 기술 |
 |------|------|
@@ -58,7 +88,7 @@
 
 ---
 
-## 로컬 실행
+## 💻 로컬 실행
 
 **요구사항:** Node.js 20.9 이상, npm
 
@@ -91,7 +121,7 @@ npm run build
 
 ---
 
-## 환경변수
+## ⚙️ 환경변수
 
 `.env.example`을 참고해 `.env.local`을 작성합니다.
 
@@ -110,7 +140,7 @@ npm run build
 
 ---
 
-## 프로젝트 구조
+## 📁 프로젝트 구조
 
 ```
 hansul-server/
@@ -135,29 +165,3 @@ hansul-server/
     ├── 시스템 아키텍처.md
     └── decisions/        # ADR (Architecture Decision Records)
 ```
-
----
-
-## 개발 워크플로우
-
-```
-feature/* or fix/*
-        ↓ PR + self-review
-     develop
-        ↓ 회의 승인 후 병합
-       main
-```
-
-- 기능·버그 수정은 `develop` 대상 PR로 작업합니다.
-- `develop → main` 승격은 팀 회의에서 포함 기능·위험·롤백 방법을 확인 후 진행합니다.
-
----
-
-## 문서
-
-| 문서 | 경로 |
-|------|------|
-| API 명세서 | `docs/API 명세서.md` |
-| ERD | `docs/ERD.md` |
-| 시스템 아키텍처 | `docs/시스템 아키텍처.md` |
-| ADR | `docs/decisions/` |
