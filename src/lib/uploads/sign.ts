@@ -21,7 +21,7 @@ export async function signUpload(userId: string | null, input: unknown, client?:
   const value = parsed.data;
   const config = PURPOSES[value.purpose];
   if (value.size_bytes > config.maxBytes) return recipeError(413, "FILE_TOO_LARGE", "파일 크기 초과");
-  if (!config.types.includes(value.content_type)) return recipeError(415, "UNSUPPORTED_MEDIA_TYPE", "지원하지 않는 파일 형식입니다");
+  if (!config.types.includes(value.content_type)) return recipeError(415, "UNSUPPORTED_FORMAT", "지원하지 않는 파일 형식입니다");
   if (value.purpose !== "stt_audio" && !value.recipe_id) return recipeError(400, "RECIPE_ID_REQUIRED", "recipe_id가 필요합니다");
   const db = client ?? createSupabaseAdminClient();
   if (value.recipe_id) {

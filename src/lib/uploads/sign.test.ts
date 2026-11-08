@@ -59,7 +59,9 @@ describe("signUpload grant", () => {
   });
   it("stt_audio의 지원하지 않는 형식은 계속 거부한다", async () => {
     const { db, createSignedUploadUrl } = setup();
-    expect((await signUpload(owner, { purpose: "stt_audio", content_type: "audio/ogg", size_bytes: 100 }, db)).status).toBe(415);
+    const res = await signUpload(owner, { purpose: "stt_audio", content_type: "audio/ogg", size_bytes: 100 }, db);
+    expect(res.status).toBe(415);
+    expect((await res.json()).code).toBe("UNSUPPORTED_FORMAT");
     expect(createSignedUploadUrl).not.toHaveBeenCalled();
   });
   it.each([[10 * 1024 * 1024 + 1, "image/png", 413], [100, "image/svg+xml", 415]])("이미지 크기·형식 제한을 유지한다", async (size, type, status) => {

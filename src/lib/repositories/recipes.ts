@@ -59,8 +59,7 @@ export async function fetchRecipeList(
   query =
     sort === "popular"
       ? query
-          .order("like_count", { ascending: false })
-          .order("save_count", { ascending: false })
+          .order("popularity_score", { ascending: false })
           .order("created_at", { ascending: false })
       : query.order("created_at", { ascending: false });
 

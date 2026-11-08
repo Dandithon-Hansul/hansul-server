@@ -46,6 +46,7 @@ describe("POST /api/profiles/setup", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(422);
+    expect((await res.json()).code).toBe("MISSING_FIELD");
   });
 
   it("정상 요청 → 200", async () => {

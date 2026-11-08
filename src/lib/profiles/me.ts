@@ -8,6 +8,7 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
 export const profilePatchSchema = z.strictObject({
   display_name: z.string().trim().min(1).max(50).optional(),
   region_code: z.string().regex(/^\d{5}$/).optional(),
+  dong: z.string().trim().min(1).max(50).nullable().optional(),
   food_preferences: z.array(z.string().trim().min(1).max(50)).max(30).optional(),
   avatar_url: z.url({ protocol: /^https$/ }).nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0);
@@ -69,13 +70,13 @@ function nextCursor(rows: { id: string; at: string }[], limit: number) {
   return rows.length > limit ? Buffer.from(JSON.stringify(rows[limit - 1])).toString("base64url") : null;
 }
 
-const fields = "id,display_name,avatar_url,region,region_code";
+const fields = "id,display_name,avatar_url,region,region_code,dong";
 
-function regionDto(code: string | null, name: string | null) {
+export function regionDto(code: string | null, name: string | null, dong: string | null) {
   if (!code && !name) return null;
   const known = mapRegions.find((region) => region.region_code === code);
   const sido = known?.sido === "대구" ? "대구광역시" : known?.sido === "경북" ? "경상북도" : null;
-  return { code, sido, sigungu: known?.region ?? name, dong: null };
+  return { code, sido, sigungu: known?.region ?? name, dong };
 }
 
 export async function readProfile(db: Database, id: string) {
@@ -104,10 +105,10 @@ export async function readProfile(db: Database, id: string) {
     page = result.data;
   }
 
-  const { region, region_code, ...rest } = profile;
+  const { region, region_code, dong, ...rest } = profile;
   return profileJson({
     ...rest,
-    region: regionDto(region_code, region),
+    region: regionDto(region_code, region, dong ?? null),
     stats: { transmitted_recipes: transmitted, saved_recipes: saved.count ?? 0, likes_received: likes },
   });
 }
