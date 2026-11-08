@@ -21,3 +21,11 @@ export function createSupabaseServerClient(accessToken?: string) {
     }),
   });
 }
+
+export function createSupabaseAdminClient() {
+  return createClient(
+    z.url().parse(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    z.string().min(1).parse(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}
