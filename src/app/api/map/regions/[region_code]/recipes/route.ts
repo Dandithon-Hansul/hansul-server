@@ -20,7 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ regi
   if (!limit.success) return fail(400, "INVALID_LIMIT", "limit은 1 이상 50 이하의 정수여야 합니다.");
 
   try {
-    return Response.json({ ...region, recipes: await getRegionRecipes(region_code, limit.data) });
+    return Response.json({ region: region.region, recipes: await getRegionRecipes(region_code, limit.data) });
   } catch {
     return fail(500, "INTERNAL_ERROR", "지역 레시피를 불러오지 못했습니다.");
   }

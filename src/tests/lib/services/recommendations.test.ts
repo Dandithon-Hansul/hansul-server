@@ -6,15 +6,16 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { getRecommendedRecipes, recommendationLimitSchema } from "@/lib/services/recommendations";
 
 describe("recommendationLimitSchema", () => {
-  it("기본 limit은 1이다", () => {
-    expect(recommendationLimitSchema.parse(undefined)).toBe(1);
+  it("기본 limit은 10이다", () => {
+    expect(recommendationLimitSchema.parse(undefined)).toBe(10);
   });
 
-  it("limit은 1만 허용한다", () => {
+  it("limit은 1~10을 허용한다", () => {
     expect(recommendationLimitSchema.safeParse("1").success).toBe(true);
+    expect(recommendationLimitSchema.safeParse("10").success).toBe(true);
     expect(recommendationLimitSchema.safeParse("0").success).toBe(false);
+    expect(recommendationLimitSchema.safeParse("11").success).toBe(false);
     expect(recommendationLimitSchema.safeParse("1.5").success).toBe(false);
-    expect(recommendationLimitSchema.safeParse("2").success).toBe(false);
   });
 });
 

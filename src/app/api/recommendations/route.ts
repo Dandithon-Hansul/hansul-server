@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       new URL(request.url).searchParams.get("limit") ?? undefined,
     );
     if (!parsedLimit.success) {
-      return recipeError(422, "INVALID_LIMIT", "추천 음식은 한 번에 1개만 조회할 수 있습니다.");
+      return recipeError(422, "INVALID_LIMIT", "limit은 1 이상 10 이하의 정수여야 합니다.");
     }
 
     const recipes = await getRecommendedRecipes(userId, parsedLimit.data);
