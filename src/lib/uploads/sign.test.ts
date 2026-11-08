@@ -52,6 +52,16 @@ describe("signUpload grant", () => {
     expect((await signUpload(owner, { purpose: "stt_audio", content_type: "audio/webm", size_bytes: 100 }, db)).status).toBe(200);
     expect(insert.mock.calls[0][0]).toMatchObject({ purpose: "stt_audio", recipe_id: null });
   });
+  it("stt_audio 25MB 초과는 계속 거부한다", async () => {
+    const { db, createSignedUploadUrl } = setup();
+    expect((await signUpload(owner, { purpose: "stt_audio", content_type: "audio/webm", size_bytes: 25 * 1024 * 1024 + 1 }, db)).status).toBe(413);
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+  it("stt_audio의 지원하지 않는 형식은 계속 거부한다", async () => {
+    const { db, createSignedUploadUrl } = setup();
+    expect((await signUpload(owner, { purpose: "stt_audio", content_type: "audio/ogg", size_bytes: 100 }, db)).status).toBe(415);
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+  });
   it.each([[10 * 1024 * 1024 + 1, "image/png", 413], [100, "image/svg+xml", 415]])("이미지 크기·형식 제한을 유지한다", async (size, type, status) => {
     const { db } = setup();
     expect((await signUpload(owner, { ...image, size_bytes: size, content_type: type }, db)).status).toBe(status);
