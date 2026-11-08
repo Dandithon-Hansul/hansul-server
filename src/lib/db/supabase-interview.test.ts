@@ -3,9 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { SupabaseInterviewRepository } from "./supabase-interview";
 const owner = "11111111-1111-4111-8111-111111111111";
 const path = `${owner}/chat_image/22222222-2222-4222-8222-222222222222.png`;
-function setup(size = 100, contentType = "image/png") {
+function setup(size = 100, contentType = "image/png", grantOverride: Record<string, unknown> | null = {}) {
   const bucket = { info: vi.fn().mockResolvedValue({ data: { size, contentType }, error: null }), createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed.test/image" }, error: null }) };
-  const repo = new SupabaseInterviewRepository({ storage: { from: () => bucket } } as unknown as SupabaseClient);
+  const grant = grantOverride === null ? null : { bucket: "uploads", path, owner_id: owner, recipe_id: "recipe", purpose: "chat_image", content_type: "image/png", size_bytes: 100, ...grantOverride };
+  const filters: Record<string, unknown> = {};
+  const query = {
+    eq: vi.fn((key: string, value: unknown) => { filters[key] = value; return query; }),
+    maybeSingle: vi.fn(async () => ({ data: grant && Object.entries(filters).every(([key, value]) => grant[key as keyof typeof grant] === value) ? grant : null, error: null })),
+  };
+  const repo = new SupabaseInterviewRepository({ from: () => ({ select: () => query }), storage: { from: () => bucket } } as unknown as SupabaseClient);
   vi.spyOn(repo, "getRecipe").mockResolvedValue({ id: "recipe", transmitter_id: owner, status: "draft", visibility: "private", transcript: "원문" });
   return { repo, bucket };
 }
@@ -24,6 +30,16 @@ describe("chat image access", () => {
   it("지원하지 않는 객체 형식은 415이다", async () => {
     const { repo } = setup(100, "image/svg+xml");
     await expect(repo.resolveImage(owner, "recipe", path)).rejects.toMatchObject({ status: 415 });
+  });
+  it.each([null, { recipe_id: "other-recipe" }, { purpose: "stt_audio" }, { owner_id: "other-owner" }, { bucket: "other-bucket" }])("발급 기록이 없거나 대상·용도가 다르면 거부한다: %j", async grant => {
+    const { repo, bucket } = setup(100, "image/png", grant);
+    await expect(repo.resolveImage(owner, "recipe", path)).rejects.toMatchObject({ status: 403, code: "UPLOAD_NOT_GRANTED" });
+    expect(bucket.info).not.toHaveBeenCalled(); expect(bucket.createSignedUrl).not.toHaveBeenCalled();
+  });
+  it.each([[101, "image/png"], [100, "image/jpeg"]])("실제 크기·형식이 발급 기록과 다르면 거부한다", async (size, type) => {
+    const { repo, bucket } = setup(size, type);
+    await expect(repo.resolveImage(owner, "recipe", path)).rejects.toMatchObject({ status: 422, code: "UPLOAD_MISMATCH" });
+    expect(bucket.createSignedUrl).not.toHaveBeenCalled();
   });
   it("본인 레시피의 허용된 이미지에는 짧은 서명 URL을 발급한다", async () => {
     const { repo, bucket } = setup();

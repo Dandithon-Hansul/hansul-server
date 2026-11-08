@@ -89,11 +89,15 @@ export class SupabaseInterviewRepository implements InterviewRepository {
     await this.requireOwned(owner, id);
     const pattern = new RegExp(`^${owner}/chat_image/[0-9a-f-]+\\.(jpg|png|webp)$`, "i");
     if (!pattern.test(path)) throw new InterviewError(403, "IMAGE_FORBIDDEN", "본인 채팅 이미지 경로만 사용할 수 있습니다");
+    const { data: grant, error: grantError } = await this.db.from("upload_grants").select("size_bytes,content_type").eq("bucket", "uploads").eq("path", path).eq("owner_id", owner).eq("recipe_id", id).eq("purpose", "chat_image").maybeSingle();
+    check(grantError);
+    if (!grant) throw new InterviewError(403, "UPLOAD_NOT_GRANTED", "이 레시피에 발급된 채팅 이미지가 아닙니다");
     const bucket = this.db.storage.from("uploads");
     const { data: info, error } = await bucket.info(path); check(error);
     if (!info || !Number.isFinite(info.size)) throw new InterviewError(422, "IMAGE_INVALID", "이미지 정보를 확인할 수 없습니다");
     if (info.size! > 10 * 1024 * 1024) throw new InterviewError(413, "IMAGE_TOO_LARGE", "이미지는 10MB 이하로 올려 주세요");
     if (!["image/jpeg", "image/png", "image/webp"].includes(info.contentType ?? "")) throw new InterviewError(415, "IMAGE_TYPE_INVALID", "지원하지 않는 이미지 형식입니다");
+    if (info.size !== grant.size_bytes || info.contentType !== grant.content_type) throw new InterviewError(422, "UPLOAD_MISMATCH", "업로드된 파일이 발급 요청과 다릅니다");
     const { data, error: signError } = await bucket.createSignedUrl(path, 900); check(signError);
     return z.string().parse(data?.signedUrl);
   }
