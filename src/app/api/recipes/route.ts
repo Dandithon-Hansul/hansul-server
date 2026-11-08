@@ -3,6 +3,10 @@ import { recipeJson, recipeError } from "@/lib/recipes/http";
 import { fetchRecipeList } from "@/lib/repositories/recipes";
 import { toPopularCard } from "@/lib/dto/recipe";
 import { parseLimit } from "@/lib/query";
+import { interviewDependencies } from "@/lib/interview/dependencies";
+import { createInterviewHandlers, interviewFailure } from "@/lib/interview/http";
+
+export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
@@ -18,4 +22,9 @@ export async function GET(request: Request) {
   } catch {
     return recipeError(500, "recipe_list_unavailable", "레시피 목록을 불러오지 못했습니다.");
   }
+}
+
+export async function POST(request: Request) {
+  try { return await createInterviewHandlers(await interviewDependencies(request)).publish(request); }
+  catch (error) { return interviewFailure(error); }
 }

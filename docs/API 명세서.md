@@ -216,6 +216,7 @@ Response 200:
 - 요청은 `{ purpose, content_type, size_bytes, recipe_id? }`, 성공 응답은 `{ bucket, path, token }`이다.
 - 용도별 제한은 `stt_audio` 25 MB, `card_voice` 5 MB, `chat_image`·`step_photo`·`evaluation_photo` 10 MB이다. 음성은 WebM/MP4/WAV, 이미지는 JPEG/PNG/WebP를 허용한다.
 - 서버는 목적과 권한을 검사하고 비공개 버킷의 `{user_id}/{purpose}/{uuid}.{ext}` 경로에 업로드 토큰을 발급한다. STT 최초 호출과 평가 사진을 제외한 용도에는 대상 레시피 ID가 필요하며 작성자만 발급받을 수 있다. 평가 사진은 평가 가능한 레시피에만 연결할 수 있다.
+- 채팅 이미지는 작성자 소유 초안에만 발급한다. 발급 기록 저장이 실패하면 토큰을 반환하지 않는다. 발급 기록이 없는 기존 이미지는 다시 업로드해야 한다.
 - 브라우저는 Supabase `uploadToSignedUrl(path, token, file)`로 파일을 올리고 후속 API에 경로를 보낸다. 서버는 버킷·용도·소유자·대상에 대한 발급 기록과 실제 객체 크기 및 형식을 확인한 뒤 사용한다. 전승 음성·완성 사진은 권한 확인 후 읽기용 서명 URL로 응답한다.
 
 ---
@@ -276,8 +277,10 @@ Response 200 (Server-Sent Events 스트리밍):
   // FE는 text와 audio 이벤트를 독립적으로 처리해 표시와 재생을 겹쳐 수행한다.
 
 Error:
+  403  해당 사용자·레시피·채팅 용도로 발급된 이미지가 아님
   413  이미지 크기 초과
-  422  recipe_id 없음
+  415  지원하지 않는 이미지 형식
+  422  recipe_id 없음 또는 객체 크기·형식이 발급 요청과 다름
 ```
 
 > TTS 공급자는 OpenAI `tts-1`을 사용한다. 문장 단위로 생성된 오디오 조각을 SSE `audio` 이벤트로 보내 텍스트 스트림과 겹쳐 재생한다.
@@ -582,11 +585,11 @@ Response 200:
   {
     profile_summary: string,
     dimensions: {
-      salt_intensity:      number,
-      liquid_reduction:    number,
-      sweet_ratio:         number,
-      browning_preference: number,
-      spice_tolerance:     number
+      salt_intensity:      number | null,
+      liquid_reduction:    number | null,
+      sweet_ratio:         number | null,
+      browning_preference: number | null,
+      spice_tolerance:     number | null
     },
     vector_updated: boolean
   }
@@ -596,6 +599,8 @@ Error:
 ```
 
 ---
+
+> 미확인 차원은 `null`이다(2026-11-08 사용자 승인). 현재 정규화된 맛 강도 확인값은 저장하지 않으므로 5개 차원 모두 `null`을 반환한다. 수량이나 confidence를 맛 강도로 바꾸지 않는다. 프로필 벡터는 인증된 전승자의 확정 감각 사례 요약을 임베딩한 1536차원 값이며, 원본 벡터는 응답에 포함하지 않는다.
 
 ## 10. 지역 지도
 
