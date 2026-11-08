@@ -110,32 +110,6 @@ npm run build
 
 ---
 
-## API 엔드포인트
-
-전체 명세는 [Swagger UI](https://hansul-server.vercel.app/api-docs) 또는 `docs/API 명세서.md`를 참고하세요.
-
-| 태그 | 엔드포인트 | 설명 |
-|------|-----------|------|
-| health | `GET /api/health` | 서버 상태 확인 |
-| profiles | `POST /api/profiles/setup` | 온보딩 프로필 설정 |
-| profiles | `GET/PATCH /api/profiles/me` | 내 프로필 조회·수정 |
-| profiles | `GET /api/profiles/:id` | 전승자 프로필 조회 |
-| recipes | `GET/POST /api/recipes` | 레시피 목록 조회·발행 |
-| recipes | `GET /api/recipes/:id` | 레시피 상세 |
-| recipes | `POST /api/recipes/:id/like` | 좋아요 토글 |
-| recipes | `POST /api/recipes/:id/save` | 저장 토글 |
-| interview | `POST /api/stt` | 음성 전사 (Whisper) |
-| interview | `POST /api/analyze` | 레시피 초안 분석 |
-| interview | `POST /api/chat` | AI 인터뷰 채팅 (SSE 스트리밍) |
-| interview | `POST /api/sensory/vectorize` | 손맛 프로파일 벡터화 |
-| steps | `POST /api/steps/images` | 단계별 AI 이미지 일괄 생성 |
-| uploads | `POST /api/uploads/sign` | 직접 업로드 서명 발급 |
-| map | `GET /api/map/regions` | 지역 목록 |
-| map | `GET /api/map/regions/:code/recipes` | 지역별 인기 레시피 |
-| search | `GET /api/search/recipes` | 레시피 검색 |
-
----
-
 ## 프로젝트 구조
 
 ```
