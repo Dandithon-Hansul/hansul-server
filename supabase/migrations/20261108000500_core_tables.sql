@@ -1,7 +1,7 @@
 -- 홈 피드 c3b51d2의 공통 DDL. profiles는 앞선 온보딩 마이그레이션에서 생성한다.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-CREATE TABLE recipes (
+CREATE TABLE IF NOT EXISTS recipes (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transmitter_id      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   title               TEXT,
@@ -28,7 +28,7 @@ CREATE TABLE recipes (
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE transmission_cards (
+CREATE TABLE IF NOT EXISTS transmission_cards (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_id           UUID NOT NULL UNIQUE REFERENCES recipes(id) ON DELETE CASCADE,
   ai_analysis         JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -38,7 +38,7 @@ CREATE TABLE transmission_cards (
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE sensory_entries (
+CREATE TABLE IF NOT EXISTS sensory_entries (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_id           UUID REFERENCES recipes(id) ON DELETE SET NULL,
   transmitter_id      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -51,7 +51,7 @@ CREATE TABLE sensory_entries (
   UNIQUE (transmitter_id, expression)
 );
 
-CREATE TABLE chat_messages (
+CREATE TABLE IF NOT EXISTS chat_messages (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_id           UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
   role                TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
@@ -61,7 +61,7 @@ CREATE TABLE chat_messages (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE cooking_sessions (
+CREATE TABLE IF NOT EXISTS cooking_sessions (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_id           UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
   learner_id          UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -71,7 +71,7 @@ CREATE TABLE cooking_sessions (
   cooked_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE recipe_saves (
+CREATE TABLE IF NOT EXISTS recipe_saves (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_id           UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
   profile_id          UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -79,7 +79,7 @@ CREATE TABLE recipe_saves (
   UNIQUE (recipe_id, profile_id)
 );
 
-CREATE TABLE recipe_likes (
+CREATE TABLE IF NOT EXISTS recipe_likes (
   recipe_id           UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
   profile_id          UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   PRIMARY KEY (recipe_id, profile_id)
@@ -89,15 +89,15 @@ CREATE TABLE recipe_likes (
 -- 인덱스
 -- =====================================================================
 
-CREATE INDEX idx_recipes_transmitter ON recipes(transmitter_id);
-CREATE INDEX idx_recipes_region ON recipes(region);
-CREATE INDEX idx_recipes_popular ON recipes(like_count DESC, created_at DESC);
-CREATE INDEX idx_chat_messages_recipe ON chat_messages(recipe_id, created_at);
-CREATE INDEX idx_sensory_transmitter ON sensory_entries(transmitter_id, expression);
-CREATE INDEX idx_cooking_sessions_learner ON cooking_sessions(learner_id, cooked_at DESC);
-CREATE INDEX idx_recipe_saves_profile ON recipe_saves(profile_id, saved_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recipes_transmitter ON recipes(transmitter_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_region ON recipes(region);
+CREATE INDEX IF NOT EXISTS idx_recipes_popular ON recipes(like_count DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_recipe ON chat_messages(recipe_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_sensory_transmitter ON sensory_entries(transmitter_id, expression);
+CREATE INDEX IF NOT EXISTS idx_cooking_sessions_learner ON cooking_sessions(learner_id, cooked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recipe_saves_profile ON recipe_saves(profile_id, saved_at DESC);
 
-CREATE INDEX idx_profiles_sensory_vector ON profiles
+CREATE INDEX IF NOT EXISTS idx_profiles_sensory_vector ON profiles
   USING ivfflat (sensory_vector vector_cosine_ops)
   WITH (lists = 10);
 
@@ -115,35 +115,44 @@ ALTER TABLE recipe_saves ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recipe_likes ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON recipes, transmission_cards, chat_messages, recipe_likes, recipe_saves FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON profiles, recipes, transmission_cards, sensory_entries, chat_messages, cooking_sessions, recipe_saves, recipe_likes TO service_role;
 
+DROP POLICY IF EXISTS public_recipe_read ON recipes;
 CREATE POLICY public_recipe_read ON recipes
   FOR SELECT USING (status = 'published' AND visibility = 'public');
 
+DROP POLICY IF EXISTS transmitter_manage_recipe ON recipes;
 CREATE POLICY transmitter_manage_recipe ON recipes
   FOR ALL USING (transmitter_id = auth.uid())
   WITH CHECK (transmitter_id = auth.uid());
 
+DROP POLICY IF EXISTS transmitter_manage_card ON transmission_cards;
 CREATE POLICY transmitter_manage_card ON transmission_cards
   FOR ALL USING (recipe_id IN (
     SELECT id FROM recipes WHERE transmitter_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS own_sensory_entries ON sensory_entries;
 CREATE POLICY own_sensory_entries ON sensory_entries
   FOR ALL USING (transmitter_id = auth.uid())
   WITH CHECK (transmitter_id = auth.uid());
 
+DROP POLICY IF EXISTS recipe_chat_access ON chat_messages;
 CREATE POLICY recipe_chat_access ON chat_messages
   FOR ALL USING (recipe_id IN (
     SELECT id FROM recipes WHERE transmitter_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS own_cooking_sessions ON cooking_sessions;
 CREATE POLICY own_cooking_sessions ON cooking_sessions
   FOR ALL USING (learner_id = auth.uid())
   WITH CHECK (learner_id = auth.uid());
 
+DROP POLICY IF EXISTS own_recipe_saves ON recipe_saves;
 CREATE POLICY own_recipe_saves ON recipe_saves
   FOR ALL USING (profile_id = auth.uid())
   WITH CHECK (profile_id = auth.uid());
 
+DROP POLICY IF EXISTS own_recipe_likes ON recipe_likes;
 CREATE POLICY own_recipe_likes ON recipe_likes
   FOR SELECT USING (profile_id = auth.uid());

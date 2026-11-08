@@ -3,6 +3,7 @@ import { createInterviewHandlers } from "./http";
 import { FakeInterviewRepository } from "../db/__fakes__/interview.fake";
 import { FakeClaude } from "../ai/__fakes__/claude.fake";
 import { FakeEmbedding } from "../ai/__fakes__/embedding.fake";
+import { analysisFixture } from "../ai/__fakes__/analysis.fixture";
 import { FakeTts } from "../ai/__fakes__/tts.fake";
 const id = "11111111-1111-4111-8111-111111111111";
 function setup(userId: string | null = "owner", repo = new FakeInterviewRepository()) {
@@ -11,6 +12,22 @@ function setup(userId: string | null = "owner", repo = new FakeInterviewReposito
 }
 function req(body: unknown) { return new Request("http://localhost/api/chat", { method: "POST", body: JSON.stringify(body) }); }
 describe("interview HTTP", () => {
+  it("발행 요청은 선택 입력인 한 마디를 검증하고 공백을 정리한다", async () => {
+    const repo = new FakeInterviewRepository();
+    repo.analysis = analysisFixture();
+    repo.analysis.questions = [];
+    repo.confirmedCount = 1;
+    const handlers = setup("owner", repo);
+    expect((await handlers.publish(req({ recipe_id: id, transmitter_quote: " " }))).status).toBe(422);
+    expect((await handlers.publish(req({ recipe_id: id, transmitter_quote: "가".repeat(301) }))).status).toBe(422);
+    const response = await handlers.publish(req({ recipe_id: id, transmitter_quote: "  간은 마지막에 맞춰요.  " }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      transmitter_quote: "간은 마지막에 맞춰요.",
+      voice_message_url: "https://example.test/quote.mp3",
+    });
+  });
+
   it("미인증 요청은 401이다", async () => {
     expect((await setup(null).analyze(req({ recipe_id: id }))).status).toBe(401);
   });

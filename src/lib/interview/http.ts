@@ -13,6 +13,7 @@ import { sse } from "../sse";
 
 export interface InterviewDependencies { userId: string | null; repo: InterviewRepository; ai: ClaudePort; embedding: EmbeddingPort; tts: TtsPort }
 const recipeInput = z.object({ recipe_id: z.uuid() }).strict();
+const publishInput = recipeInput.extend({ transmitter_quote: z.string().trim().min(1).max(300).optional() });
 const chatInput = z.object({ recipe_id: z.uuid(), message: z.string().trim().min(1).max(8000), image_path: z.string().max(500).optional(), tts: z.boolean().default(false) }).strict();
 async function body<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
   let value: unknown;
@@ -35,7 +36,7 @@ export function createInterviewHandlers(d: InterviewDependencies) {
       catch (error) { return interviewFailure(error); }
     },
     async publish(request: Request) {
-      try { const user = owner(); const input = await body(request, recipeInput); return recipeJson(await publishRecipe(d.repo, user, input.recipe_id)); }
+      try { const user = owner(); const input = await body(request, publishInput); return recipeJson(await publishRecipe(d.repo, user, input.recipe_id, { quote: input.transmitter_quote, tts: d.tts })); }
       catch (error) { return interviewFailure(error); }
     },
     async vectorize(request: Request) {

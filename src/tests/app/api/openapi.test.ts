@@ -30,6 +30,7 @@ describe("GET /api/openapi", () => {
         "/api/profiles/me/saved",
         "/api/profiles/setup",
         "/api/recipes",
+        "/api/steps/images",
         "/api/recipes/{id}",
         "/api/recipes/{id}/like",
         "/api/recipes/{id}/save",

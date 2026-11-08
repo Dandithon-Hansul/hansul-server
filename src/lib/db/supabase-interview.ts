@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { analysisSchema, type Analysis } from "../ai/analysis";
@@ -14,13 +15,13 @@ function check(error: { message: string } | null) {
   if (error.message.includes("S04_SENSORY_INSUFFICIENT")) throw new InterviewError(422, "SENSORY_INSUFFICIENT", "감각 항목을 먼저 확인해 주세요");
   throw new Error("INTERVIEW_DATABASE_ERROR");
 }
-const recipeSchema = z.object({ id: z.string(), transmitter_id: z.string(), status: z.enum(["draft", "published"]), visibility: z.enum(["public", "private"]), transcript: z.string().nullable() });
-const publishSchema = z.object({ recipe_id: z.string(), status: z.literal("published"), context_summary: z.string(), voice_message_url: z.string().nullable() });
+const recipeSchema = z.object({ id: z.string(), transmitter_id: z.string(), status: z.enum(["draft", "published"]), visibility: z.enum(["public", "private"]), transcript: z.string().nullable(), transmitter_quote: z.string().nullish() });
+const publishSchema = z.object({ recipe_id: z.string(), status: z.literal("published"), context_summary: z.string(), transmitter_quote: z.string().nullable().default(null), voice_message_url: z.string().nullable() });
 
 export class SupabaseInterviewRepository implements InterviewRepository {
   constructor(private db: SupabaseClient) {}
   async getRecipe(owner: string, id: string): Promise<InterviewRecipe | null> {
-    const { data, error } = await this.db.from("recipes").select("id,transmitter_id,status,visibility,transcript").eq("id", id).eq("transmitter_id", owner).maybeSingle();
+    const { data, error } = await this.db.from("recipes").select("id,transmitter_id,status,visibility,transcript,transmitter_quote").eq("id", id).eq("transmitter_id", owner).maybeSingle();
     check(error); return data ? recipeSchema.parse(data) : null;
   }
   private async requireOwned(owner: string, id: string) {
@@ -66,17 +67,32 @@ export class SupabaseInterviewRepository implements InterviewRepository {
   async countConfirmed(owner: string, id: string) {
     const { count, error } = await this.db.from("sensory_cases").select("id", { count: "exact", head: true }).eq("recipe_id", id).eq("transmitter_id", owner); check(error); return count ?? 0;
   }
-  async publish(owner: string, id: string, expectedAnalysis: Analysis): Promise<PublishResult> {
-    const { data, error } = await this.db.rpc("s04_publish", { p_owner: owner, p_recipe: id, p_analysis: expectedAnalysis }); check(error); return this.withVoice(owner, id, publishSchema.parse(data));
+  async publish(owner: string, id: string, expectedAnalysis: Analysis, quote?: string): Promise<PublishResult> {
+    const { data, error } = await this.db.rpc("s04_publish_with_quote", { p_owner: owner, p_recipe: id, p_analysis: expectedAnalysis, p_quote: quote ?? null }); check(error); return this.withVoice(owner, id, publishSchema.parse(data));
   }
   async publishedResult(owner: string, id: string): Promise<PublishResult> {
-    await this.requireOwned(owner, id);
+    const recipe = await this.getRecipe(owner, id);
+    if (!recipe) throw new InterviewError(404, "NOT_FOUND", "레시피를 찾을 수 없습니다");
     const { data, error } = await this.db.from("transmission_cards").select("context_summary,voice_message_url").eq("recipe_id", id).maybeSingle(); check(error);
-    return this.withVoice(owner, id, publishSchema.parse({ recipe_id: id, status: "published", context_summary: data?.context_summary ?? "", voice_message_url: data?.voice_message_url ?? null }));
+    return this.withVoice(owner, id, publishSchema.parse({ recipe_id: id, status: "published", context_summary: data?.context_summary ?? "", transmitter_quote: recipe.transmitter_quote ?? null, voice_message_url: data?.voice_message_url ?? null }));
   }
   private async withVoice(owner: string, id: string, result: PublishResult) {
     return { ...result, voice_message_url: await recipeMediaUrl(this.db, result.voice_message_url, "card-voice", `${owner}/${id}`) };
   }
+  async storeQuoteAudio(owner: string, id: string, audio: Buffer) {
+    const path = `${owner}/${id}/quote-${randomUUID()}.mp3`;
+    const bucket = this.db.storage.from("card-voice");
+    const { error: uploadError } = await bucket.upload(path, audio, { contentType: "audio/mpeg" });
+    check(uploadError);
+
+    const { data, error } = await this.db.from("transmission_cards")
+      .update({ voice_message_url: path })
+      .eq("recipe_id", id).is("voice_message_url", null)
+      .select("recipe_id").maybeSingle();
+    check(error);
+    if (!data) await bucket.remove([path]);
+  }
+
   async storeAudio(owner: string, id: string, name: string, audio: Buffer) {
     await this.requireOwned(owner, id);
     const path = `${owner}/${id}/${name}.mp3`;

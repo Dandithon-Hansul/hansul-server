@@ -3,7 +3,7 @@ import type { ChatMessage, DictionaryEntry } from "../ai/claude";
 
 export interface InterviewRecipe {
   id: string; transmitter_id: string; status: "draft" | "published";
-  visibility: "public" | "private"; transcript: string | null;
+  visibility: "public" | "private"; transcript: string | null; transmitter_quote?: string | null;
 }
 export interface StoredMessage extends ChatMessage { id: string; audio_url?: string | null }
 export interface SensoryCase {
@@ -11,7 +11,7 @@ export interface SensoryCase {
   context: string; food_name: string; resolved_value: string; evidence: string;
   embedding: number[]; confidence: number;
 }
-export interface PublishResult { recipe_id: string; status: "published"; context_summary: string; voice_message_url: string | null }
+export interface PublishResult { recipe_id: string; status: "published"; context_summary: string; transmitter_quote: string | null; voice_message_url: string | null }
 export interface InterviewRepository {
   getRecipe(owner: string, id: string): Promise<InterviewRecipe | null>;
   getAnalysis(owner: string, id: string): Promise<Analysis | null>;
@@ -22,8 +22,9 @@ export interface InterviewRepository {
   appendMessage(owner: string, id: string, message: ChatMessage & { audio_url?: string | null }): Promise<string>;
   addCase(owner: string, item: SensoryCase): Promise<void>;
   countConfirmed(owner: string, id: string): Promise<number>;
-  publish(owner: string, id: string, expectedAnalysis: Analysis): Promise<PublishResult>;
+  publish(owner: string, id: string, expectedAnalysis: Analysis, quote?: string): Promise<PublishResult>;
   publishedResult(owner: string, id: string): Promise<PublishResult>;
+  storeQuoteAudio(owner: string, id: string, audio: Buffer): Promise<void>;
   storeAudio(owner: string, id: string, name: string, audio: Buffer): Promise<string>;
   resolveImage(owner: string, id: string, path: string): Promise<string>;
 }

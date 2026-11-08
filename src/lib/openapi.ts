@@ -195,8 +195,62 @@ export const openApiDocument = {
         tags: ["recipes"],
         summary: "레시피 초안 발행",
         security: bearerSecurity,
-        requestBody: jsonBody({ $ref: "#/components/schemas/RecipeIdRequest" }),
+        requestBody: jsonBody({
+          type: "object",
+          additionalProperties: false,
+          required: ["recipe_id"],
+          properties: {
+            recipe_id: { type: "string", format: "uuid" },
+            transmitter_quote: { type: "string", minLength: 1, maxLength: 300 },
+          },
+        }),
         responses: { "200": successResponse(), "401": errorResponse },
+      },
+    },
+    "/api/steps/images": {
+      post: {
+        tags: ["recipes"],
+        summary: "마지막 단계까지 AI 조리 이미지 생성",
+        security: bearerSecurity,
+        requestBody: jsonBody({
+          type: "object",
+          additionalProperties: false,
+          required: ["recipe_id"],
+          properties: { recipe_id: { type: "string", format: "uuid" } },
+        }),
+        responses: {
+          "200": {
+            description: "생성 결과와 실패 단계",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["generated", "failed_orders"],
+                  properties: {
+                    generated: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        required: ["order", "image_url", "prompt_used"],
+                        properties: {
+                          order: { type: "integer", minimum: 1 },
+                          image_url: { type: "string", format: "uri" },
+                          prompt_used: { type: "string" },
+                        },
+                      },
+                    },
+                    failed_orders: { type: "array", items: { type: "integer", minimum: 1 } },
+                  },
+                },
+              },
+            },
+          },
+          "400": errorResponse,
+          "401": errorResponse,
+          "404": errorResponse,
+          "422": errorResponse,
+          "502": errorResponse,
+        },
       },
     },
     "/api/recipes/{id}": {
