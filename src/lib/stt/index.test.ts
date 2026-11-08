@@ -74,6 +74,23 @@ describe("processStt — transcript 경로", () => {
 });
 
 describe("processStt — audio_path 경로", () => {
+  it("사용자 소유의 stt_audio 경로가 아니면 다운로드하지 않는다", async () => {
+    mockFrom.mockReturnValue({
+      insert: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: "recipe1" }, error: null }),
+        }),
+      }),
+    });
+
+    const res = await processStt("user1", {
+      audio_path: "uploads/user2/stt_audio/private.webm",
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(mockTranscribe).not.toHaveBeenCalled();
+  });
   it("audio_path로 Whisper 전사 후 draft를 생성한다", async () => {
     const newRecipeId = "new-recipe-uuid";
     mockFrom.mockReturnValue({

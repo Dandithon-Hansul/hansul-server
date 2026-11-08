@@ -12,10 +12,17 @@ const bodySchema = z.union([
 
 export type SttInput = z.infer<typeof bodySchema>;
 
-async function transcribeAudio(audioPath: string): Promise<string> {
+function isOwnedSttAudioPath(userId: string, audioPath: string): boolean {
+  const [bucket, ownerId, purpose, ...pathParts] = audioPath.split("/");
+  return bucket === "uploads" && ownerId === userId && purpose === "stt_audio" && pathParts.length === 1 && Boolean(pathParts[0]);
+}
+
+async function transcribeAudio(userId: string, audioPath: string): Promise<string> {
+  const [, ownerId, purpose, filename] = audioPath.split("/");
+  const bucket = "uploads";
+
   const db = createSupabaseAdminClient();
-  const bucket = audioPath.split("/")[0];
-  const path = audioPath.slice(bucket.length + 1);
+  const path = `${ownerId}/${purpose}/${filename}`;
 
   const { data, error } = await db.storage.from(bucket).download(path);
   if (error || !data) throw new Error("STORAGE_DOWNLOAD_FAILED");
@@ -75,7 +82,10 @@ export async function processStt(userId: string | null, input: SttInput) {
 
   if ("audio_path" in parsed.data) {
     audioPath = parsed.data.audio_path;
-    transcript = await transcribeAudio(audioPath);
+    if (!isOwnedSttAudioPath(userId, audioPath)) {
+      return recipeError(400, "INVALID_AUDIO_PATH", "오디오 경로가 올바르지 않습니다");
+    }
+    transcript = await transcribeAudio(userId, audioPath);
   } else {
     transcript = parsed.data.transcript;
   }
