@@ -402,7 +402,7 @@ Response 200 (Server-Sent Events 스트리밍):
 
 ## 6. 단계별 AI 이미지 일괄 생성
 
-> 이미지 생성 모델은 서버의 IMAGE_MODEL로 설정한다. 생성된 파일은 Storage에 저장하고 API는 이미지 URL을 반환한다.
+> 이미지 생성 모델은 서버의 IMAGE_MODEL로 설정한다. 작성자는 발행 완료 후 호출한다. 재호출 시 이미 저장된 단계 이미지를 재사용한다. 생성된 파일은 Storage에 저장하고 API는 이미지 URL을 반환한다.
 >
 
 ```
