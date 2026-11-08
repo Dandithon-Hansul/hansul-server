@@ -8,7 +8,7 @@ import {
 } from "@/lib/repositories/recommendations";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
-export const recommendationLimitSchema = z.coerce.number().int().min(1).max(100).default(10);
+export const recommendationLimitSchema = z.coerce.number().int().min(1).max(1).default(1);
 
 const preferenceCategories: Record<string, string[]> = {
   "탕·찌개": ["탕", "찌개", "국", "전골", "육개장", "국밥", "곰탕"],

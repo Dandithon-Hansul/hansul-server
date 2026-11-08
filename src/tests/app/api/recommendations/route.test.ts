@@ -37,7 +37,7 @@ describe("GET /api/recommendations", () => {
     expect(response.status).toBe(422);
   });
 
-  it("기본 limit 10으로 추천 레시피 배열을 반환한다", async () => {
+  it("기본 limit 1로 추천 레시피 배열을 반환한다", async () => {
     vi.mocked(getRecipeViewer).mockResolvedValue("user-1");
     vi.mocked(getRecommendedRecipes).mockResolvedValue([
       {
@@ -63,6 +63,6 @@ describe("GET /api/recommendations", () => {
         },
       ],
     });
-    expect(getRecommendedRecipes).toHaveBeenCalledWith("user-1", 10);
+    expect(getRecommendedRecipes).toHaveBeenCalledWith("user-1", 1);
   });
 });

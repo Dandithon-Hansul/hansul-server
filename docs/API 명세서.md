@@ -685,7 +685,7 @@ Response 200:
 ## 11. 개인화 추천
 
 ```
-GET /api/recommendations?limit=10
+GET /api/recommendations?limit=1
 Authorization: Bearer <access_token>
 
 Response 200:
@@ -702,7 +702,7 @@ Response 200:
   }
 ```
 
-> `food_preferences` 기반으로 추천한다.
+> `food_preferences` 기반 추천 음식 1개를 반환한다.
 >
 
 ---
