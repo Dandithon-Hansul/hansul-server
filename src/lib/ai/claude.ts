@@ -1,44 +1,28 @@
-export interface StructuredRecipe {
-  title: string;
-  ingredients: Array<{ name: string; amount: string; unit?: string }>;
-  steps: Array<{ order: number; description: string }>;
-  context_summary?: string;
-}
+import type { Analysis } from "./analysis";
 
-export interface QuestionOption {
+export interface DictionaryEntry {
   id: string;
-  text: string;
-  options: string[];
-  allow_free_text: boolean;
-}
-
-export interface AutoAppliedEntry {
   expression: string;
+  dimension: string;
+  context: string;
+  food_name: string;
   resolved_value: string;
   confidence: number;
+  confirmations: number;
+  embedding: number[] | null;
 }
-
-export interface AnalyzeResult {
-  structured: StructuredRecipe;
-  questions: QuestionOption[];
-  auto_applied: AutoAppliedEntry[];
-}
-
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   image_url?: string;
 }
-
+export interface AnalyzeInput {
+  transcript: string;
+  dictionary: DictionaryEntry[];
+  history: ChatMessage[];
+  previous_analysis?: Analysis;
+}
 export interface ClaudePort {
-  analyzeJson(
-    transcript: string,
-    autoApplied: AutoAppliedEntry[],
-    asrUncertainties?: string[],
-  ): Promise<AnalyzeResult>;
-  chatStream(
-    messages: ChatMessage[],
-    systemPrompt: string,
-    onChunk: (text: string) => void,
-  ): Promise<string>;
+  analyzeJson(input: AnalyzeInput): Promise<Analysis>;
+  chatStream(messages: ChatMessage[], systemPrompt: string, onChunk: (text: string) => void, signal?: AbortSignal): Promise<string>;
 }
