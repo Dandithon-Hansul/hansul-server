@@ -7,6 +7,7 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
 export const setupSchema = z.object({
   display_name: z.string().trim().min(1).max(50),
   region_code: z.string().regex(/^\d{5}$/),
+  dong: z.string().trim().min(1).max(50).optional(),
   food_preferences: z.array(z.string().trim().min(1).max(50)).max(10).optional(),
 });
 
@@ -56,6 +57,7 @@ export async function createOnboarding(
         display_name: data.display_name,
         region_code: data.region_code,
         region: region.region,
+        dong: data.dong ?? null,
         food_preferences: data.food_preferences ?? [],
         updated_at: new Date().toISOString(),
       },

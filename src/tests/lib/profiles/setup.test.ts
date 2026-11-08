@@ -33,6 +33,20 @@ describe("setupSchema", () => {
   it("food_preferences 없어도 성공", () => {
     expect(setupSchema.safeParse({ display_name: "한솔", region_code: "47170" }).success).toBe(true);
   });
+
+  it("dong 포함 정상 입력 성공", () => {
+    expect(
+      setupSchema.safeParse({ display_name: "한솔", region_code: "47170", dong: "정하동" }).success,
+    ).toBe(true);
+  });
+
+  it("dong 없어도 성공", () => {
+    expect(setupSchema.safeParse({ display_name: "한솔", region_code: "47170" }).success).toBe(true);
+  });
+
+  it("dong이 빈 문자열이면 실패", () => {
+    expect(setupSchema.safeParse({ display_name: "한솔", region_code: "47170", dong: "" }).success).toBe(false);
+  });
 });
 
 describe("createOnboarding", () => {
@@ -108,5 +122,27 @@ describe("createOnboarding", () => {
     mockDb.from.mockReturnValue({ upsert: upsertMock });
     await createOnboarding(mockDb as never, "user-1", { display_name: "한솔", region_code: "47170" });
     expect(upsertMock.mock.calls[0][0]).toMatchObject({ food_preferences: [] });
+  });
+
+  it("dong 있으면 upsert에 dong 포함", async () => {
+    const upsertMock = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "user-1" }, error: null }),
+      }),
+    });
+    mockDb.from.mockReturnValue({ upsert: upsertMock });
+    await createOnboarding(mockDb as never, "user-1", { display_name: "한솔", region_code: "47170", dong: "정하동" });
+    expect(upsertMock.mock.calls[0][0]).toMatchObject({ dong: "정하동" });
+  });
+
+  it("dong 없으면 upsert에 dong이 null", async () => {
+    const upsertMock = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "user-1" }, error: null }),
+      }),
+    });
+    mockDb.from.mockReturnValue({ upsert: upsertMock });
+    await createOnboarding(mockDb as never, "user-1", { display_name: "한솔", region_code: "47170" });
+    expect(upsertMock.mock.calls[0][0]).toMatchObject({ dong: null });
   });
 });

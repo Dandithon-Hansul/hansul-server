@@ -5,6 +5,7 @@ CREATE TABLE public.profiles (
   display_name     TEXT        NOT NULL,
   region           TEXT,
   region_code      TEXT,
+  dong             TEXT,
   avatar_url       TEXT,
   food_preferences JSONB       NOT NULL DEFAULT '[]'::jsonb,
   sensory_vector   vector(1536),
