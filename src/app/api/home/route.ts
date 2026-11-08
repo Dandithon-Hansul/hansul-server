@@ -1,5 +1,5 @@
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { resolveUserId } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { getRecipeViewer, recipeJson, recipeError } from "@/lib/recipes/http";
 import { buildHomeResponse } from "@/lib/home-response";
 import { fetchRecipeList, fetchViewer, fetchInteractions } from "@/lib/repositories/recipes";
 import { parseLimit } from "@/lib/query";
@@ -11,8 +11,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const limit = parseLimit(searchParams.get("limit"), 10);
 
-    const client = createSupabaseServiceClient();
-    const userId = await resolveUserId(client, request);
+    const client = createSupabaseAdminClient();
+    const userId = await getRecipeViewer(request);
 
     const response = await buildHomeResponse(
       {
@@ -24,8 +24,8 @@ export async function GET(request: Request) {
       { userId, limit, topLimit: TOP_LIMIT },
     );
 
-    return Response.json(response);
+    return recipeJson(response);
   } catch {
-    return Response.json({ error: "홈 피드를 불러오지 못했습니다." }, { status: 500 });
+    return recipeError(500, "home_unavailable", "홈 피드를 불러오지 못했습니다.");
   }
 }

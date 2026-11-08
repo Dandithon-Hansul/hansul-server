@@ -1,4 +1,5 @@
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { recipeJson, recipeError } from "@/lib/recipes/http";
 import { searchRecipes } from "@/lib/repositories/recipes";
 import { toSearchCard } from "@/lib/dto/recipe";
 import { parseLimit } from "@/lib/query";
@@ -10,11 +11,11 @@ export async function GET(request: Request) {
     const regionCode = searchParams.get("region_code");
     const limit = parseLimit(searchParams.get("limit"), 20);
 
-    const client = createSupabaseServiceClient();
+    const client = createSupabaseAdminClient();
     const rows = await searchRecipes(client, { q, regionCode, limit });
 
-    return Response.json({ recipes: rows.map(toSearchCard), next_cursor: null });
+    return recipeJson({ recipes: rows.map(toSearchCard), next_cursor: null });
   } catch {
-    return Response.json({ error: "검색에 실패했습니다." }, { status: 500 });
+    return recipeError(500, "search_unavailable", "검색에 실패했습니다.");
   }
 }
