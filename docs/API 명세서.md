@@ -10,7 +10,7 @@
 | 메서드 | 경로 | 역할 |
 | --- | --- | --- |
 | `GET` | `/api/profiles/me` | 내 프로필 조회 |
-| `PATCH` | `/api/profiles/me` | 이름·지역·선호 음식·프로필 수정 |
+| `PATCH` | `/api/profiles/me` | 이름·지역·프로필 사진 수정 |
 | `POST` | `/api/profiles/setup` | 역할 설정 (전승자·학습자) |
 | `GET` | `/api/home` | 홈 피드 (인사말 + 이달의 TOP + 개인화 추천 통합) |
 | `GET` | `/api/search/recipes` | 음식명·지역·전승자 통합 검색 |
@@ -26,8 +26,6 @@
 | `POST` | `/api/recipes/:id/save` | 저장 토글 |
 | `POST` | `/api/evaluate` | 맛 평가 → AI 조정 제안 (스트리밍) |
 | `POST` | `/api/steps/images` | 단계별 AI 이미지 일괄 생성 |
-| `POST` | `/api/steps/:order/image` | 단계별 AI 이미지 재생성 |
-| `POST` | `/api/steps/:order/photo` | 마지막 단계 실제 사진 업로드 |
 | `POST` | `/api/sensory/vectorize` | 손맛 프로파일 벡터 생성·저장 |
 | `GET` | `/api/profiles/me/recipes` | 내가 전승한 레시피 목록 |
 | `GET` | `/api/profiles/me/saved` | 저장한 레시피 목록 |
@@ -59,7 +57,7 @@
 | --- | --- | --- | --- |
 | P0 | 음성 기록 + 채팅 보완 | `/api/stt`, `/api/analyze`, `/api/chat` | 발화부터 텍스트·음성·이미지 답변과 최종 구조화까지 한 플로우로 동작 |
 | P0 | 손맛 프로파일 | 감각 사전, `auto_applied`, `/api/sensory/vectorize` | 기존 해석 우선 적용, 불일치 항목만 재질문, 벡터 저장 |
-| P0 | 레시피·단계 이미지·한마디 | `/api/recipes`, 단계 이미지/사진, 음성 API | 목록·상세·재생성·실사진·음성 재생 동작 |
+| P0 | 레시피·단계 이미지·한마디 | `/api/recipes`, 단계 이미지, 음성 API | 목록·상세·마지막 단계까지 AI 이미지 표시·음성 재생 동작 |
 | P0 | 전승자·학습자 분기 | `/api/profiles/setup`, `profiles.role`, RLS | 역할별 진입점과 권한 분리 |
 | P0 | 지역 레시피 지도 | `/api/map/regions`, Kakao Maps, 데모 시드 | 대구·경북 폴리곤·레시피 프리뷰 노출 |
 | P1 | 채팅 TTS 동시 출력 | `/api/chat (본문 tts: true)`, SSE chunk/audio | 텍스트 표시와 음성 재생이 겹쳐 진행 |
@@ -77,11 +75,9 @@ Authorization: Bearer <access_token>
 Response 200:
   {
     "id": "UUID",
-    "role": "transmitter",
     "display_name": "김한솔",
     "avatar_url": "https://...",
     "region": {"code": "47170", "sido": "경상북도", "sigungu": "안동시", "dong": "정하동"},
-    "food_preferences": ["된장찌개", "구이", "장조림"],
     "stats": {"transmitted_recipes": 2, "saved_recipes": 8, "likes_received": 34}
   }
 ```
@@ -95,7 +91,6 @@ Body:
   {
     "display_name": "김한솔",
     "region_code": "47170",
-    "food_preferences": ["된장찌개", "구이", "장조림"],
     "avatar_url": "https://..."
   }
 
@@ -130,7 +125,6 @@ Body:
 Response 200:
   {
     "profile_id": "UUID",
-    "role": "transmitter",
     "start_route": "/record"
   }
 ```
@@ -216,6 +210,7 @@ Response 200:
 - 요청은 `{ purpose, content_type, size_bytes, recipe_id? }`, 성공 응답은 `{ bucket, path, token }`이다.
 - 용도별 제한은 `stt_audio` 25 MB, `card_voice` 5 MB, `chat_image`·`step_photo`·`evaluation_photo` 10 MB이다. 음성은 WebM/MP4/WAV, 이미지는 JPEG/PNG/WebP를 허용한다.
 - 서버는 목적과 권한을 검사하고 비공개 버킷의 `{user_id}/{purpose}/{uuid}.{ext}` 경로에 업로드 토큰을 발급한다. STT 최초 호출과 평가 사진을 제외한 용도에는 대상 레시피 ID가 필요하며 작성자만 발급받을 수 있다. 평가 사진은 평가 가능한 레시피에만 연결할 수 있다.
+- 채팅 이미지는 작성자 소유 초안에만 발급한다. 발급 기록 저장이 실패하면 토큰을 반환하지 않는다. 발급 기록이 없는 기존 이미지는 다시 업로드해야 한다.
 - 브라우저는 Supabase `uploadToSignedUrl(path, token, file)`로 파일을 올리고 후속 API에 경로를 보낸다. 서버는 버킷·용도·소유자·대상에 대한 발급 기록과 실제 객체 크기 및 형식을 확인한 뒤 사용한다. 전승 음성·완성 사진은 권한 확인 후 읽기용 서명 URL로 응답한다.
 
 ---
@@ -276,8 +271,10 @@ Response 200 (Server-Sent Events 스트리밍):
   // FE는 text와 audio 이벤트를 독립적으로 처리해 표시와 재생을 겹쳐 수행한다.
 
 Error:
+  403  해당 사용자·레시피·채팅 용도로 발급된 이미지가 아님
   413  이미지 크기 초과
-  422  recipe_id 없음
+  415  지원하지 않는 이미지 형식
+  422  recipe_id 없음 또는 객체 크기·형식이 발급 요청과 다름
 ```
 
 > TTS 공급자는 OpenAI `tts-1`을 사용한다. 문장 단위로 생성된 오디오 조각을 SSE `audio` 이벤트로 보내 텍스트 스트림과 겹쳐 재생한다.
@@ -427,46 +424,7 @@ Response 200:
     failed_orders: number[]
   }
 
-// 마지막 단계는 generated와 failed_orders 양쪽에서 제외
-```
-
----
-
-## 6-1. 단계별 AI 이미지 재생성
-
-```
-POST /api/steps/:order/image
-Content-Type: application/json
-
-Body:
-  {
-    recipe_id: UUID,
-    hint?:     string
-  }
-
-Response 200:
-  { image_url: string }
-
-Error:
-  404  해당 단계 없음
-```
-
----
-
-## 6-2. 마지막 단계 실제 사진 업로드
-
-```
-POST /api/steps/:order/photo
-Content-Type: application/json
-
-Body:
-  { recipe_id: UUID, photo_path: string }
-
-Response 200:
-  { image_url: string }
-
-Error:
-  413  사진 크기 초과
+// 생성 대상에 마지막 단계를 포함한다.
 ```
 
 ---
@@ -509,6 +467,7 @@ Response 200:
     recipe_id:         UUID,
     title:             string,
     hero_image_url:    string | null,
+    transmitter_id:    UUID,
     transmitter_name:  string,
     transmitter_quote: string,
     context_summary:   string,
@@ -547,6 +506,8 @@ Error:
 
 ---
 
+> 상세 응답의 transmitter_id로 작성자 공개 프로필을 연다. 단계별 안내는 마지막 단계까지 steps[].image_url을 표시하며, 값이 없으면 기본 이미지를 표시한다.
+
 ## 8-1. 좋아요·저장
 
 ```
@@ -569,6 +530,12 @@ Response 200:
 
 ---
 
+## 8-2. 작성자 공개 프로필
+
+GET /api/profiles/:id는 로그인한 사용자에게 공개 발행 레시피가 있는 작성자의 이름·사진·지역·소개와 공개 레시피 목록 및 통계를 반환한다. 편집과 저장 목록은 내 프로필 API에서만 제공한다.
+
+---
+
 ## 9. 손맛 프로파일 벡터화
 
 ```
@@ -582,11 +549,11 @@ Response 200:
   {
     profile_summary: string,
     dimensions: {
-      salt_intensity:      number,
-      liquid_reduction:    number,
-      sweet_ratio:         number,
-      browning_preference: number,
-      spice_tolerance:     number
+      salt_intensity:      number | null,
+      liquid_reduction:    number | null,
+      sweet_ratio:         number | null,
+      browning_preference: number | null,
+      spice_tolerance:     number | null
     },
     vector_updated: boolean
   }
@@ -596,6 +563,8 @@ Error:
 ```
 
 ---
+
+> 미확인 차원은 `null`이다(2026-11-08 사용자 승인). 현재 정규화된 맛 강도 확인값은 저장하지 않으므로 5개 차원 모두 `null`을 반환한다. 수량이나 confidence를 맛 강도로 바꾸지 않는다. 프로필 벡터는 인증된 전승자의 확정 감각 사례 요약을 임베딩한 1536차원 값이며, 원본 벡터는 응답에 포함하지 않는다.
 
 ## 10. 지역 지도
 
@@ -712,8 +681,7 @@ Response 200:
 - 사용자 ID는 검증한 Supabase 세션에서 가져오고, 쓰기 API는 서버에서 역할 및 대상 리소스 권한을 검사한다.
 - 탐색·검색·지도·추천에는 공개 발행 레시피만 포함한다. 초안·비공개 상세는 작성자만 열람한다.
 - SSE 연결 전 오류는 HTTP JSON 응답으로, 연결 이후 오류는 SSE error 이벤트로 반환한다.
-- 단계 이미지 요청은 마지막 단계를 제외한다. 일괄 생성에서 일부 실패 시 성공한 이미지를 보존하고 응답에 failed_orders: number[]를 포함한다.
-- 완성 사진 연결은 작성자에게만 허용하며 대상 단계가 마지막 단계여야 한다.
+- 단계 이미지 일괄 생성은 마지막 단계까지 포함한다. 실패한 단계는 failed_orders로 반환한다.
 
 - 인증이 필요한 API는 `Authorization: Bearer <Supabase access token>`을 사용한다.
 - 성공 응답은 JSON이며, 비동기 스트리밍 API는 `text/event-stream`을 사용한다.
