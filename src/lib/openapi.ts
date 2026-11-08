@@ -469,7 +469,7 @@ export const openApiDocument = {
         properties: {
           purpose: {
             type: "string",
-            enum: ["stt_audio", "card_voice", "chat_image"],
+            enum: ["stt_audio", "card_voice", "chat_image", "avatar"],
           },
           content_type: { type: "string" },
           size_bytes: { type: "integer", minimum: 1 },
