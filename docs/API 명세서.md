@@ -1,7 +1,7 @@
 # API 명세서
 
 > **버전**: 0.1 | **작성일**: 2026-11-02 | **작성자**: BE
->
+> 
 
 ---
 
@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | `GET` | `/api/profiles/me` | 내 프로필 조회 |
 | `PATCH` | `/api/profiles/me` | 이름·지역·프로필 사진 수정 |
-| `POST` | `/api/profiles/setup` | 역할 설정 (전승자·학습자) |
+| `POST` | `/api/profiles/setup` | 온보딩 기본 정보 저장 |
 | `GET` | `/api/home` | 홈 피드 (인사말 + 이달의 TOP + 개인화 추천 통합) |
 | `GET` | `/api/search/recipes` | 음식명·지역·전승자 통합 검색 |
 | `POST` | `/api/uploads/sign` | Storage 직접 업로드 토큰 발급 |
@@ -23,7 +23,6 @@
 | `GET` | `/api/recipes/:id` | 레시피 상세 조회 |
 | `POST` | `/api/recipes/:id/like` | 좋아요 토글 |
 | `POST` | `/api/recipes/:id/save` | 저장 토글 |
-| `POST` | `/api/evaluate` | 맛 평가 → AI 조정 제안 (스트리밍) |
 | `POST` | `/api/steps/images` | 단계별 AI 이미지 일괄 생성 |
 | `POST` | `/api/sensory/vectorize` | 손맛 프로파일 벡터 생성·저장 |
 | `GET` | `/api/profiles/me/recipes` | 내가 전승한 레시피 목록 |
@@ -38,10 +37,7 @@
 
 | UI 화면 | 호출 API | 핵심 데이터 |
 | --- | --- | --- |
-| 온보딩 1단계 | `PATCH /api/profiles/me` | 이름 |
-| 온보딩 2단계 | `PATCH /api/profiles/me` | 거주 지역 |
-| 온보딩 3단계 | `PATCH /api/profiles/me` | 선호 음식 복수 선택 |
-| 역할 설정 | `POST /api/profiles/setup` | 전승자·학습자 역할 |
+| 온보딩 기본 정보 저장 | `POST /api/profiles/setup` | 이름·지역·선호 음식(선택) |
 | 홈 | `GET /api/home` | 인사말, 이달의 TOP, 추천 레시피 |
 | 홈 검색 | `GET /api/search/recipes` | 음식명·지역·전승자 검색 결과 |
 | AI 음성 기록 | `/api/stt` → `/api/analyze` → `/api/chat` | 녹음, transcript, 후속 질문 |
@@ -56,11 +52,10 @@
 | --- | --- | --- | --- |
 | P0 | 음성 기록 + 채팅 보완 | `/api/stt`, `/api/analyze`, `/api/chat` | 발화부터 텍스트·음성·이미지 답변과 최종 구조화까지 한 플로우로 동작 |
 | P0 | 손맛 프로파일 | 감각 사전, `auto_applied`, `/api/sensory/vectorize` | 기존 해석 우선 적용, 불일치 항목만 재질문, 벡터 저장 |
-| P0 | 레시피·단계 이미지·한마디 | `/api/recipes`, 단계 이미지, 음성 API | 목록·상세·마지막 단계까지 AI 이미지 표시·음성 재생 동작 |
-| P0 | 전승자·학습자 분기 | `/api/profiles/setup`, `profiles.role`, RLS | 역할별 진입점과 권한 분리 |
+| P0 | 레시피·단계 이미지·한마디 | `/api/recipes`, 단계 이미지 일괄 생성, 발행 시 한 마디 TTS | 목록·상세·단계 이미지·한 마디 재생 동작 |
+| P0 | 온보딩 기본 정보 | `POST /api/profiles/setup` | 저장 후 홈으로 이동 |
 | P0 | 지역 레시피 지도 | `/api/map/regions`, Kakao Maps, 데모 시드 | 대구·경북 폴리곤·레시피 프리뷰 노출 |
 | P1 | 채팅 TTS 동시 출력 | `/api/chat (본문 tts: true)`, SSE chunk/audio | 텍스트 표시와 음성 재생이 겹쳐 진행 |
-| P1 | 맛 평가와 조정 제안 | `/api/evaluate` | 평가 저장 후 다음 조리 조정안 출력 |
 | P2 | 개인화 추천 | `/api/recommendations` | food_preferences 기반 추천 목록 반환 |
 
 ---
@@ -90,7 +85,7 @@ Body:
   {
     "display_name": "김한솔",
     "region_code": "47170",
-    "avatar_url": "https://..."
+    "avatar_url": "https://..." | "{user_id}/avatar/{uuid}.jpg"
   }
 
 Response 200:
@@ -99,14 +94,14 @@ Response 200:
   }
 ```
 
-> 필드는 단계별로 일부만 보내도 된다.
->
+> 프로필 편집은 이름, 지역, 프로필 사진 중 바뀐 필드만 보낸다. 선호 음식은 온보딩에서만 선택 입력한다.
+> 
 
 ---
 
-## 0-1-1. 역할 설정
+## 0-1-1. 온보딩 기본 정보 저장
 
-프론트엔드 진입 경로는 `/app/(auth)/setup`이며, 설정 저장은 다음 API를 사용한다.
+온보딩에서 기본 정보를 저장한다. 사용자 역할 선택 단계는 없다.
 
 ```
 POST /api/profiles/setup
@@ -117,19 +112,16 @@ Body:
   {
     "display_name": "김한솔",
     "region_code": "47170",
-    "food_preferences": ["된장찌개", "구이", "장조림"],
-    "role": "transmitter"
+    "food_preferences": ["된장찌개", "구이", "장조림"]
   }
 
 Response 200:
   {
     "profile_id": "UUID",
-    "start_route": "/record"
+    "start_route": "/"
   }
 ```
 
-- `role`은 `transmitter` 또는 `learner`이다.
-- 전승자는 음성 기록·채팅·레시피 생성, 학습자는 레시피 조회·단계별 조리·평가 화면으로 분기한다.
 
 ---
 
@@ -198,7 +190,7 @@ Response 200:
 ```
 
 > 검색어가 비어 있으면 최근 검색어 또는 추천 검색어를 반환할 수 있다.
->
+> 
 
 ---
 
@@ -207,10 +199,9 @@ Response 200:
 `POST /api/uploads/sign` (인증 필요, JSON)
 
 - 요청은 `{ purpose, content_type, size_bytes, recipe_id? }`, 성공 응답은 `{ bucket, path, token }`이다.
-- 용도별 제한은 `stt_audio` 25 MB, `chat_image`·`step_photo`·`evaluation_photo` 10 MB이다. 음성은 WebM/MP4/WAV, 이미지는 JPEG/PNG/WebP를 허용한다.
-- 서버는 목적과 권한을 검사하고 비공개 버킷의 `{user_id}/{purpose}/{uuid}.{ext}` 경로에 업로드 토큰을 발급한다. STT 최초 호출과 평가 사진을 제외한 용도에는 대상 레시피 ID가 필요하며 작성자만 발급받을 수 있다. 평가 사진은 평가 가능한 레시피에만 연결할 수 있다.
-- 채팅 이미지는 작성자 소유 초안에만 발급한다. 발급 기록 저장이 실패하면 토큰을 반환하지 않는다. 발급 기록이 없는 기존 이미지는 다시 업로드해야 한다.
-- 브라우저는 Supabase `uploadToSignedUrl(path, token, file)`로 파일을 올리고 후속 API에 경로를 보낸다. 서버는 버킷·용도·소유자·대상에 대한 발급 기록과 실제 객체 크기 및 형식을 확인한 뒤 사용한다. 완성 사진은 권한 확인 후 읽기용 서명 URL로 응답한다.
+- 용도별 제한은 `stt_audio` 25 MB, `chat_image` 10 MB, `avatar` 5 MB이다. 음성은 WebM/MP4/WAV, 이미지는 JPEG/PNG/WebP를 허용한다.
+- 서버는 목적과 권한을 검사하고 비공개 버킷의 `{user_id}/{purpose}/{uuid}.{ext}` 경로에 업로드 토큰을 발급한다. `stt_audio`와 `avatar`를 제외한 용도에는 대상 레시피 ID가 필요하며 작성자만 발급받을 수 있다.
+- 브라우저는 Supabase `uploadToSignedUrl(path, token, file)`로 파일을 올리고 후속 API에 경로를 보낸다. 서버는 버킷·용도·소유자·대상에 대한 발급 기록과 실제 객체 크기 및 형식을 확인한 뒤 사용한다.
 
 ---
 
@@ -243,7 +234,7 @@ Error:
 ## 2. 채팅 (레시피 보완 + 감각어 답변)
 
 > 감각어 확인 질문에 대한 답변도 이 엔드포인트로 전달한다. 채팅 히스토리와 원본 transcript를 합산해 레시피를 최종 확정한다.
->
+> 
 
 ```
 POST /api/chat
@@ -270,21 +261,19 @@ Response 200 (Server-Sent Events 스트리밍):
   // FE는 text와 audio 이벤트를 독립적으로 처리해 표시와 재생을 겹쳐 수행한다.
 
 Error:
-  403  해당 사용자·레시피·채팅 용도로 발급된 이미지가 아님
   413  이미지 크기 초과
-  415  지원하지 않는 이미지 형식
-  422  recipe_id 없음 또는 객체 크기·형식이 발급 요청과 다름
+  422  recipe_id 없음
 ```
 
 > TTS 공급자는 OpenAI `tts-1`을 사용한다. 문장 단위로 생성된 오디오 조각을 SSE `audio` 이벤트로 보내 텍스트 스트림과 겹쳐 재생한다.
->
+> 
 
 ---
 
 ## 3. 분석 (구조화 + 감각어 탐지)
 
 > 서버는 전승자의 `sensory_entries`에서 같은 표현을 먼저 조회한다. 확정된 기존 값은 `auto_applied`로 반환하고, 새 표현 또는 문맥상 불일치가 감지된 표현만 질문한다.
->
+> 
 
 ```
 POST /api/analyze
@@ -342,56 +331,18 @@ Response 200:
 
 ---
 
-## 4-1. 작성자 한 마디 TTS
+## 4-1. 전승자 한 마디 입력 및 재생
 
-작성자가 직접 입력하거나 음성 입력에서 변환한 문장을 확인한 뒤 발행 요청의 transmitter_quote에 담는다. 앞뒤 공백을 제외하고 1~300자이며 생략할 수 있다.
-
-서버는 최초 발행과 같은 트랜잭션에서 문장을 저장한다. 이어서 TTS로 합성한 MP3를 비공개 card-voice 버킷에 저장하고 발행·상세 응답에서 voice_message_url로 서명 URL을 제공한다. 합성 또는 저장에 실패하면 레시피는 발행된 상태를 유지하고 문장을 텍스트로 보여준다. 같은 레시피를 다시 발행 요청해도 기존 문장과 음성은 바뀌지 않는다.
-
----
-
-## 5. 맛 평가 → AI 피드백
-
-> AI 조정 제안 모델은 Claude를 사용하며, 모델명은 서버 환경 변수로 교체 가능하게 둔다.
->
-
-```
-POST /api/evaluate
-Content-Type: application/json
-
-Body:
-  {
-    recipe_id:  UUID,
-
-    evaluation: {
-      salt:          -2 | -1 | 0 | 1 | 2,
-      consistency:   -2 | -1 | 0 | 1 | 2,
-      doneness:      -2 | -1 | 0 | 1 | 2,
-      overall:       1 | 2 | 3,
-      rule_followed: boolean
-    },
-    photo_path?: string
-  }
-
-Response 200 (Server-Sent Events 스트리밍):
-  Content-Type: text/event-stream
-
-  event: chunk
-  data: {"text": "지난번보다 소금을"}
-
-  event: chunk
-  data: {"text": " 0.3g 줄이고,"}
-
-  event: done
-  data: {"session_id": UUID}
-```
+- 작성자는 레시피를 마무리할 때 한 마디를 채팅 입력란에 직접 쓰거나, 음성 입력을 텍스트로 변환해 확인한다. 프론트는 확정된 문장을 발행 요청의 transmitter_quote에 보낸다.
+- 서버는 확정 문장을 레시피에 저장하고 TTS로 합성한 오디오를 Storage에 저장한다. 발행 및 상세 응답은 voice_message_url로 재생용 서명 URL을 제공한다.
+- 한 마디 입력은 선택이다. 입력이 없거나 TTS 생성에 실패하면 voice_message_url은 null이며, 발행은 완료된다. 문장을 입력했다면 음성 없이도 상세에서 텍스트를 표시한다.
 
 ---
 
 ## 6. 단계별 AI 이미지 일괄 생성
 
-> 이미지 생성 모델은 서버의 IMAGE_MODEL로 설정한다. 작성자는 발행 완료 후 호출한다. 재호출 시 이미 저장된 단계 이미지를 재사용한다. 생성된 파일은 Storage에 저장하고 API는 이미지 URL을 반환한다.
->
+> 이미지 생성 모델은 서버의 IMAGE_MODEL로 설정한다. 생성된 파일은 Storage에 저장하고 API는 이미지 URL을 반환한다.
+> 
 
 ```
 POST /api/steps/images
@@ -412,7 +363,7 @@ Response 200:
     failed_orders: number[]
   }
 
-// 생성 대상에 마지막 단계를 포함한다.
+// 마지막 단계도 생성 대상이다. 성공하면 generated, 실패하면 failed_orders에 포함한다.
 ```
 
 ---
@@ -440,7 +391,7 @@ Response 200:
 ```
 
 > `sort=popular`이면 `like_count + save_count` 합산 기준으로 정렬한다.
->
+> 
 
 ---
 
@@ -455,7 +406,6 @@ Response 200:
     recipe_id:         UUID,
     title:             string,
     hero_image_url:    string | null,
-    transmitter_id:    UUID,
     transmitter_name:  string,
     transmitter_quote: string | null,
     context_summary:   string,
@@ -490,11 +440,9 @@ Error:
 ```
 
 > 탐색·검색·지도에는 `status=published` 및 `visibility=public`인 레시피만 노출한다. 원본 음성, 전체 transcript, 내부 감각 사전과 조리 평가 기록은 응답에서 제외한다.
->
+> 
 
 ---
-
-> 상세 응답의 transmitter_id로 작성자 공개 프로필을 연다. 단계별 안내는 마지막 단계까지 steps[].image_url을 표시하며, 값이 없으면 기본 이미지를 표시한다.
 
 ## 8-1. 좋아요·저장
 
@@ -514,13 +462,7 @@ Response 200:
 ```
 
 > 동일 요청을 반복하면 토글된다 (좋아요 → 좋아요 취소).
->
-
----
-
-## 8-2. 작성자 공개 프로필
-
-GET /api/profiles/:id는 로그인한 사용자에게 공개 발행 레시피가 있는 작성자의 이름·사진·지역·소개와 공개 레시피 목록 및 통계를 반환한다. 편집과 저장 목록은 내 프로필 API에서만 제공한다.
+> 
 
 ---
 
@@ -537,11 +479,11 @@ Response 200:
   {
     profile_summary: string,
     dimensions: {
-      salt_intensity:      number | null,
-      liquid_reduction:    number | null,
-      sweet_ratio:         number | null,
-      browning_preference: number | null,
-      spice_tolerance:     number | null
+      salt_intensity:      number,
+      liquid_reduction:    number,
+      sweet_ratio:         number,
+      browning_preference: number,
+      spice_tolerance:     number
     },
     vector_updated: boolean
   }
@@ -551,8 +493,6 @@ Error:
 ```
 
 ---
-
-> 미확인 차원은 `null`이다(2026-11-08 사용자 승인). 현재 정규화된 맛 강도 확인값은 저장하지 않으므로 5개 차원 모두 `null`을 반환한다. 수량이나 confidence를 맛 강도로 바꾸지 않는다. 프로필 벡터는 인증된 전승자의 확정 감각 사례 요약을 임베딩한 1536차원 값이며, 원본 벡터는 응답에 포함하지 않는다.
 
 ## 10. 지역 지도
 
@@ -588,7 +528,7 @@ Response 200:
 ```
 
 > 프론트엔드는 공공데이터포털 GeoJSON(정적 번들)으로 폴리곤을 렌더링하고 Kakao Maps 베이스 맵 위에 오버레이한다. 핀을 누르면 해당 지역 인기 레시피 목록이 바텀 시트에 표시된다. MVP는 대구·경북을 제공하고 동일한 행정구역 코드 구조로 전국 확장이 가능해야 한다.
->
+> 
 
 ---
 
@@ -642,7 +582,7 @@ Response 200:
 ## 11. 개인화 추천
 
 ```
-GET /api/recommendations?limit=1
+GET /api/recommendations?limit=10
 Authorization: Bearer <access_token>
 
 Response 200:
@@ -659,17 +599,17 @@ Response 200:
   }
 ```
 
-> `food_preferences` 기반 추천 음식 1개를 반환한다.
->
+> `food_preferences` 기반으로 추천한다.
+> 
 
 ---
 
 ## 12. 공통 규약
 
-- 사용자 ID는 검증한 Supabase 세션에서 가져오고, 쓰기 API는 서버에서 역할 및 대상 리소스 권한을 검사한다.
+- 사용자 ID는 검증한 Supabase 세션에서 가져오고, 쓰기 API는 서버에서 대상 리소스에 대한 권한을 검사한다.
 - 탐색·검색·지도·추천에는 공개 발행 레시피만 포함한다. 초안·비공개 상세는 작성자만 열람한다.
 - SSE 연결 전 오류는 HTTP JSON 응답으로, 연결 이후 오류는 SSE error 이벤트로 반환한다.
-- 단계 이미지 일괄 생성은 마지막 단계까지 포함한다. 실패한 단계는 failed_orders로 반환한다.
+- 단계별 AI 이미지 일괄 생성은 마지막 완성 단계까지 포함한다. 일부 실패 시 성공한 이미지를 보존하고 응답에 failed_orders: number[]를 포함한다.
 
 - 인증이 필요한 API는 `Authorization: Bearer <Supabase access token>`을 사용한다.
 - 성공 응답은 JSON이며, 비동기 스트리밍 API는 `text/event-stream`을 사용한다.
@@ -724,7 +664,6 @@ data: {"code": "AI_TIMEOUT", "message": "AI 응답 시간을 초과했습니다.
 | `FILE_TOO_LARGE` | 413 | 파일 크기 초과 |
 | `UNSUPPORTED_FORMAT` | 415 | 지원하지 않는 파일 포맷 |
 | `MISSING_FIELD` | 422 | 필수 필드 누락 |
-| `INVALID_ROLE` | 422 | 유효하지 않은 역할 값 |
 | `SENSORY_INSUFFICIENT` | 422 | 감각 항목 부족 (확정 감각 항목 1개 이상 필요) |
 | `AUDIO_TRANSCRIPTION_FAILED` | 422 | 음성 변환 실패 |
 | `INGREDIENT_UNRECOGNIZED` | 422 | 재료 인식 불가 |

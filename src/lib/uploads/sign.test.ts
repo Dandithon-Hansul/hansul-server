@@ -68,4 +68,22 @@ describe("signUpload grant", () => {
     const { db } = setup();
     expect((await signUpload(owner, { ...image, size_bytes: size, content_type: type }, db)).status).toBe(status);
   });
+  it("avatar는 recipe_id 없이 발급된다", async () => {
+    const { db, insert } = setup();
+    const r = await signUpload(owner, { purpose: "avatar", content_type: "image/png", size_bytes: 100 }, db);
+    expect(r.status).toBe(200);
+    const result = await r.json();
+    expect(result.path).toMatch(new RegExp(`^${owner}/avatar/`));
+    expect(insert.mock.calls[0][0]).toMatchObject({ purpose: "avatar", recipe_id: null });
+  });
+  it("avatar 5MB 초과는 거부한다", async () => {
+    const { db, createSignedUploadUrl } = setup();
+    expect((await signUpload(owner, { purpose: "avatar", content_type: "image/png", size_bytes: 5 * 1024 * 1024 + 1 }, db)).status).toBe(413);
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+  it("avatar 지원하지 않는 형식은 거부한다", async () => {
+    const { db, createSignedUploadUrl } = setup();
+    expect((await signUpload(owner, { purpose: "avatar", content_type: "image/gif", size_bytes: 100 }, db)).status).toBe(415);
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+  });
 });
