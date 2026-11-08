@@ -8,9 +8,11 @@ const PURPOSES = {
   stt_audio: { maxBytes: 25 * 1024 * 1024, types: ["audio/webm", "audio/mp4", "audio/wav"] },
   card_voice: { maxBytes: 5 * 1024 * 1024, types: ["audio/webm", "audio/mp4", "audio/wav"] },
   chat_image: { maxBytes: 10 * 1024 * 1024, types: ["image/jpeg", "image/png", "image/webp"] },
+  avatar: { maxBytes: 5 * 1024 * 1024, types: ["image/jpeg", "image/png", "image/webp"] },
 };
+const NO_RECIPE_PURPOSES = new Set(["stt_audio", "avatar"]);
 const uploadInput = z.object({
-  purpose: z.enum(["stt_audio", "card_voice", "chat_image"]),
+  purpose: z.enum(["stt_audio", "card_voice", "chat_image", "avatar"]),
   content_type: z.string(), size_bytes: z.number().int().positive(), recipe_id: z.uuid().optional(),
 }).strict();
 
@@ -22,7 +24,7 @@ export async function signUpload(userId: string | null, input: unknown, client?:
   const config = PURPOSES[value.purpose];
   if (value.size_bytes > config.maxBytes) return recipeError(413, "FILE_TOO_LARGE", "파일 크기 초과");
   if (!config.types.includes(value.content_type)) return recipeError(415, "UNSUPPORTED_FORMAT", "지원하지 않는 파일 형식입니다");
-  if (value.purpose !== "stt_audio" && !value.recipe_id) return recipeError(400, "RECIPE_ID_REQUIRED", "recipe_id가 필요합니다");
+  if (!NO_RECIPE_PURPOSES.has(value.purpose) && !value.recipe_id) return recipeError(400, "RECIPE_ID_REQUIRED", "recipe_id가 필요합니다");
   const db = client ?? createSupabaseAdminClient();
   if (value.recipe_id) {
     const { data, error } = await db.from("recipes").select("id,status").eq("id", value.recipe_id).eq("transmitter_id", userId).maybeSingle();
