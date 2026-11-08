@@ -9,12 +9,6 @@
 | Dev (develop 브랜치) | https://hansul-server-git-develop-eunhyes-projects-0b70d4c2.vercel.app |
 | Swagger UI | https://hansul-server.vercel.app/api-docs |
 
-## 배포
-
-| 환경 | URL |
-|------|-----|
-| Production | https://hansul-server.vercel.app |
-| Swagger UI | https://hansul-server.vercel.app/api-docs |
 
 ## 로컬 실행
 
