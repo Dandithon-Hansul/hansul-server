@@ -195,7 +195,15 @@ export const openApiDocument = {
         tags: ["recipes"],
         summary: "레시피 초안 발행",
         security: bearerSecurity,
-        requestBody: jsonBody({ $ref: "#/components/schemas/RecipeIdRequest" }),
+        requestBody: jsonBody({
+          type: "object",
+          additionalProperties: false,
+          required: ["recipe_id"],
+          properties: {
+            recipe_id: { type: "string", format: "uuid" },
+            transmitter_quote: { type: "string", minLength: 1, maxLength: 300 },
+          },
+        }),
         responses: { "200": successResponse(), "401": errorResponse },
       },
     },

@@ -23,8 +23,11 @@ export class FakeInterviewRepository implements InterviewRepository {
   }
   async addCase(_owner: string, item: SensoryCase) { this.cases.push(item); this.confirmedCount++; }
   async countConfirmed() { return this.confirmedCount; }
-  async publish(owner: string, id: string) { this.recipe.status = "published"; this.recipe.visibility = "public"; this.publishCalls++; return this.publishedResult(owner, id); }
-  async publishedResult(_owner: string, id: string) { return { recipe_id: id, status: "published" as const, context_summary: "가족 레시피", voice_message_url: null }; }
+  quote: string | null = null;
+  quoteAudioUrl: string | null = null;
+  async publish(owner: string, id: string, _analysis: Analysis, quote?: string) { this.quote = quote ?? null; this.recipe.status = "published"; this.recipe.visibility = "public"; this.publishCalls++; return this.publishedResult(owner, id); }
+  async publishedResult(_owner: string, id: string) { return { recipe_id: id, status: "published" as const, context_summary: "가족 레시피", transmitter_quote: this.quote, voice_message_url: this.quoteAudioUrl }; }
+  async storeQuoteAudio() { this.quoteAudioUrl = "https://example.test/quote.mp3"; }
   async storeAudio(_owner: string, _id: string, name: string) { return `https://example.test/${name}.mp3`; }
   async resolveImage() { return "https://example.test/image.png"; }
 }

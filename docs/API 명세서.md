@@ -19,7 +19,6 @@
 | `POST` | `/api/analyze` | 레시피 구조화 + 감각어 탐지 |
 | `POST` | `/api/chat` | 채팅으로 레시피 보완 (이미지 첨부 가능, 스트리밍 텍스트+TTS) |
 | `POST` | `/api/recipes` | 레시피 생성 (AI 처리 결과 저장) |
-| `POST` | `/api/recipes/:id/voice` | 전승자 한 마디 음성 업로드 |
 | `GET` | `/api/recipes` | 레시피 목록 조회 |
 | `GET` | `/api/recipes/:id` | 레시피 상세 조회 |
 | `POST` | `/api/recipes/:id/like` | 좋아요 토글 |
@@ -208,10 +207,10 @@ Response 200:
 `POST /api/uploads/sign` (인증 필요, JSON)
 
 - 요청은 `{ purpose, content_type, size_bytes, recipe_id? }`, 성공 응답은 `{ bucket, path, token }`이다.
-- 용도별 제한은 `stt_audio` 25 MB, `card_voice` 5 MB, `chat_image`·`step_photo`·`evaluation_photo` 10 MB이다. 음성은 WebM/MP4/WAV, 이미지는 JPEG/PNG/WebP를 허용한다.
+- 용도별 제한은 `stt_audio` 25 MB, `chat_image`·`step_photo`·`evaluation_photo` 10 MB이다. 음성은 WebM/MP4/WAV, 이미지는 JPEG/PNG/WebP를 허용한다.
 - 서버는 목적과 권한을 검사하고 비공개 버킷의 `{user_id}/{purpose}/{uuid}.{ext}` 경로에 업로드 토큰을 발급한다. STT 최초 호출과 평가 사진을 제외한 용도에는 대상 레시피 ID가 필요하며 작성자만 발급받을 수 있다. 평가 사진은 평가 가능한 레시피에만 연결할 수 있다.
 - 채팅 이미지는 작성자 소유 초안에만 발급한다. 발급 기록 저장이 실패하면 토큰을 반환하지 않는다. 발급 기록이 없는 기존 이미지는 다시 업로드해야 한다.
-- 브라우저는 Supabase `uploadToSignedUrl(path, token, file)`로 파일을 올리고 후속 API에 경로를 보낸다. 서버는 버킷·용도·소유자·대상에 대한 발급 기록과 실제 객체 크기 및 형식을 확인한 뒤 사용한다. 전승 음성·완성 사진은 권한 확인 후 읽기용 서명 URL로 응답한다.
+- 브라우저는 Supabase `uploadToSignedUrl(path, token, file)`로 파일을 올리고 후속 API에 경로를 보낸다. 서버는 버킷·용도·소유자·대상에 대한 발급 기록과 실제 객체 크기 및 형식을 확인한 뒤 사용한다. 완성 사진은 권한 확인 후 읽기용 서명 URL로 응답한다.
 
 ---
 
@@ -329,36 +328,25 @@ POST /api/recipes
 Content-Type: application/json
 
 Body:
-  { recipe_id: UUID }
+  { recipe_id: UUID, transmitter_quote?: string }
 
 Response 200:
   {
     recipe_id:         UUID,
     status:            "published",
     context_summary:   string,
+    transmitter_quote: string | null,
     voice_message_url: string | null
   }
 ```
 
 ---
 
-## 4-1. 전승자 한 마디 음성 업로드
+## 4-1. 작성자 한 마디 TTS
 
-```
-POST /api/recipes/:id/voice
-Content-Type: application/json
+작성자가 직접 입력하거나 음성 입력에서 변환한 문장을 확인한 뒤 발행 요청의 transmitter_quote에 담는다. 앞뒤 공백을 제외하고 1~300자이며 생략할 수 있다.
 
-Body:
-  { audio_path: string }
-
-Response 200:
-  { voice_message_url: string }
-
-Error:
-  413  오디오 크기 초과
-  404  레시피 없음
-  403  전승자 본인만 업로드 가능
-```
+서버는 최초 발행과 같은 트랜잭션에서 문장을 저장한다. 이어서 TTS로 합성한 MP3를 비공개 card-voice 버킷에 저장하고 발행·상세 응답에서 voice_message_url로 서명 URL을 제공한다. 합성 또는 저장에 실패하면 레시피는 발행된 상태를 유지하고 문장을 텍스트로 보여준다. 같은 레시피를 다시 발행 요청해도 기존 문장과 음성은 바뀌지 않는다.
 
 ---
 
@@ -469,7 +457,7 @@ Response 200:
     hero_image_url:    string | null,
     transmitter_id:    UUID,
     transmitter_name:  string,
-    transmitter_quote: string,
+    transmitter_quote: string | null,
     context_summary:   string,
     voice_message_url: string | null,
     cooking_time:      number,             // 분 단위

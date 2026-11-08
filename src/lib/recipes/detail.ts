@@ -111,7 +111,7 @@ export async function getRecipeDetail(id: string, userId: string | null) {
       transmitter_name: profile.data!.display_name,
       region: row.region,
       region_code: row.region_code,
-      transmitter_quote: row.transmitter_quote ?? "",
+      transmitter_quote: row.transmitter_quote,
       context_summary: card.data?.context_summary ?? "",
       voice_message_url: voiceMessageUrl,
       cooking_time: row.cooking_time,
