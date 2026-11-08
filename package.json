@@ -22,6 +22,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "server-only": "^0.0.1",
+    "swagger-ui-dist": "^5.34.1",
     "zod": "^4.0.0"
   },
   "devDependencies": {
