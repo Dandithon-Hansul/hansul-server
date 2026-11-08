@@ -1,6 +1,13 @@
 # hansul-server
 한술 프로젝트 백엔드 서버입니다.
 
+## 배포
+
+| 환경 | URL |
+|------|-----|
+| Production | https://hansul-server.vercel.app |
+| Swagger UI | https://hansul-server.vercel.app/api-docs |
+
 ## 로컬 실행
 
 Node.js 20.9 이상과 npm이 필요합니다.
