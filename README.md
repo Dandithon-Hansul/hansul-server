@@ -1,39 +1,40 @@
-# 한술 — 지역 식문화 전승 서비스 · 백엔드
-
-> 대구·경북의 향토음식과 가정에서 전해 내려오는 조리법을 AI 음성 대화로 기록하고,  
-> 누구나 쉽게 찾아보고 따라 만들 수 있도록 돕는 지역 식문화 전승 서비스
-
 <div align="center">
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Supabase](https://img.shields.io/badge/Supabase-Database%20%C2%B7%20Auth%20%C2%B7%20Storage-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com)
-[![Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel)](https://hansul-server.vercel.app)
-[![Claude](https://img.shields.io/badge/Claude-Sonnet%204.6-D97706?logo=anthropic&logoColor=white)](https://anthropic.com)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+# 🍚 한술
+
+**대구·경북 지역 식문화 전승 서비스 · 백엔드**
+
+> *'쪼매', '적당히', '한 움큼'*  
+> 감각으로만 전해지는 손맛을 AI가 기록합니다.
+
+<br>
+
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Supabase](https://img.shields.io/badge/Supabase-Database%20%C2%B7%20Auth%20%C2%B7%20Storage-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
+[![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=flat-square&logo=vercel)](https://hansul-server.vercel.app)
+[![Claude](https://img.shields.io/badge/Claude-Sonnet%204.6-D97706?style=flat-square&logo=anthropic&logoColor=white)](https://anthropic.com)
+[![License](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
+
+<br>
+
+[🌐 Production](https://hansul-server.vercel.app) &nbsp;·&nbsp;
+[🔧 Dev](https://hansul-server-git-develop-eunhyes-projects-0b70d4c2.vercel.app) &nbsp;·&nbsp;
+[📄 API Docs](https://hansul-server.vercel.app/api-docs)
 
 </div>
+
+<br>
 
 ---
 
 ## 목차
 
-- [배포 환경](#배포-환경)
-- [서비스 개요](#서비스-개요)
-- [기술 스택](#기술-스택)
-- [로컬 실행](#로컬-실행)
-- [환경변수](#환경변수)
-- [프로젝트 구조](#프로젝트-구조)
-
----
-
-## 🚀 배포 환경
-
-| 환경 | URL |
-|------|-----|
-| Production | https://hansul-server.vercel.app |
-| Dev (develop 브랜치) | https://hansul-server-git-develop-eunhyes-projects-0b70d4c2.vercel.app |
-| Swagger UI | https://hansul-server.vercel.app/api-docs |
+- [서비스 개요](#-서비스-개요)
+- [기술 스택](#️-기술-스택)
+- [로컬 실행](#-로컬-실행)
+- [환경변수](#️-환경변수)
+- [프로젝트 구조](#-프로젝트-구조)
 
 ---
 
@@ -43,7 +44,9 @@
 
 **한술**은 AI 음성 대화로 조리법을 쉽게 기록하고, 대구·경북 지역의 손맛을 누구나 찾아 따라 만들 수 있도록 연결합니다.
 
-### 핵심 기능
+<br>
+
+### ✨ 핵심 기능
 
 #### 🎙️ 음성 레시피 기록
 
@@ -73,18 +76,27 @@
 
 ## 🛠️ 기술 스택
 
-| 영역 | 기술 |
-|------|------|
-| 프레임워크 | Next.js 16 (App Router + API Routes) |
-| 언어 | TypeScript 5 |
-| 데이터베이스 | Supabase PostgreSQL (pgvector 확장) |
-| 인증 / 스토리지 | Supabase Auth, Supabase Storage |
-| AI — 대화 · 분석 | Claude Sonnet 4.6 (Anthropic) |
-| AI — STT | Web Speech API / OpenAI Whisper (fallback) |
-| AI — 이미지 | OpenAI DALL-E 3 |
-| AI — TTS | OpenAI tts-1 |
-| 배포 | Vercel (GitHub 연동 자동 배포) |
-| API 문서 | OpenAPI 3.1 · Swagger UI |
+**Framework & Language**
+
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
+
+**Database & Infrastructure**
+
+![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791?style=flat-square&logo=postgresql&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel)
+
+**AI & APIs**
+
+![Claude](https://img.shields.io/badge/Claude-Sonnet%204.6-D97706?style=flat-square&logo=anthropic&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-Whisper%20%C2%B7%20DALL--E%203%20%C2%B7%20TTS-412991?style=flat-square&logo=openai&logoColor=white)
+![Kakao](https://img.shields.io/badge/Kakao-Maps-FFCD00?style=flat-square&logo=kakao&logoColor=000)
+
+**Docs**
+
+![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-6BA539?style=flat-square&logo=openapiinitiative&logoColor=white)
+![Swagger](https://img.shields.io/badge/Swagger-UI-85EA2D?style=flat-square&logo=swagger&logoColor=000)
 
 ---
 
