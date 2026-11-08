@@ -1,0 +1,2 @@
+-- Historical version already recorded in Hansul-dev.
+-- Fresh installations use the timestamped core schema and B read contract below.
