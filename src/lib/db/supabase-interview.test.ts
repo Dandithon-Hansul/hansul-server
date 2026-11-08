@@ -43,3 +43,20 @@ describe("published recipe voice", () => {
     expect((await repo.publishedResult(owner, "recipe")).voice_message_url).toBe("https://signed.test/voice");
   });
 });
+
+describe("profile vector ownership", () => {
+  it("인증된 사용자 ID로만 프로필 벡터를 갱신한다", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: owner }, error: null });
+    const eq = vi.fn().mockReturnValue({ select: () => ({ maybeSingle }) });
+    const update = vi.fn().mockReturnValue({ eq });
+    const repo = new SupabaseInterviewRepository({ from: () => ({ update }) } as unknown as SupabaseClient);
+    const vector = Array(1536).fill(0.1);
+    await repo.saveProfileVector(owner, vector);
+    expect(eq).toHaveBeenCalledWith("id", owner);
+    expect(update.mock.calls[0][0].sensory_vector).toBe(JSON.stringify(vector));
+  });
+  it("프로필이 없으면 성공으로 반환하지 않는다", async () => {
+    const repo = new SupabaseInterviewRepository({ from: () => ({ update: () => ({ eq: () => ({ select: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }) } as unknown as SupabaseClient);
+    await expect(repo.saveProfileVector(owner, Array(1536).fill(0.1))).rejects.toMatchObject({ status: 404, code: "PROFILE_NOT_FOUND" });
+  });
+});

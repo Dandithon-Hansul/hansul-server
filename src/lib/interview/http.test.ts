@@ -5,8 +5,8 @@ import { FakeClaude } from "../ai/__fakes__/claude.fake";
 import { FakeEmbedding } from "../ai/__fakes__/embedding.fake";
 import { FakeTts } from "../ai/__fakes__/tts.fake";
 const id = "11111111-1111-4111-8111-111111111111";
-function setup(userId: string | null = "owner") {
-  const repo = new FakeInterviewRepository(); repo.recipe.id = id;
+function setup(userId: string | null = "owner", repo = new FakeInterviewRepository()) {
+  repo.recipe.id = id;
   return createInterviewHandlers({ userId, repo, ai: new FakeClaude(), tts: new FakeTts(), embedding: new FakeEmbedding() });
 }
 function req(body: unknown) { return new Request("http://localhost/api/chat", { method: "POST", body: JSON.stringify(body) }); }
@@ -32,4 +32,21 @@ describe("interview HTTP", () => {
     expect(r.headers.get("content-type")).toContain("text/event-stream");
     const frames = await r.text(); expect(frames).toContain("event: done\ndata: "); expect(frames).not.toContain("event: audio");
   });
+  it("벡터화는 인증이 필요하며 확정 사례가 없으면 422이다", async () => {
+    expect((await setup(null).vectorize(req({}))).status).toBe(401);
+    const r = await setup().vectorize(req({}));
+    expect(r.status).toBe(422); expect(await r.json()).toMatchObject({ code: "SENSORY_INSUFFICIENT" });
+  });
+  it("벡터화 입력으로 타인 ID나 임의 차원값을 받지 않는다", async () => {
+    expect((await setup().vectorize(req({ owner: "stranger", dimensions: { salt_intensity: 1 } }))).status).toBe(422);
+  });
+  it("벡터화 응답은 null 차원을 포함하고 내부 임베딩은 노출하지 않는다", async () => {
+    const repo = new FakeInterviewRepository();
+    repo.dictionary = [{ id: "case", expression: "쪼매", dimension: "salt_intensity", context: "나물 간하기", food_name: "나물무침", resolved_value: "찻숟가락 반", confidence: 0.6, confirmations: 1, embedding: null }];
+    const r = await setup("owner", repo).vectorize(req({}));
+    expect(r.status).toBe(200); expect(r.headers.get("cache-control")).toContain("no-store");
+    const result = await r.json(); expect(Object.values(result.dimensions)).toEqual([null, null, null, null, null]);
+    expect(result.vector_updated).toBe(true); expect(result).not.toHaveProperty("embedding");
+  });
+
 });

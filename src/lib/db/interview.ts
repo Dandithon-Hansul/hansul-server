@@ -17,6 +17,7 @@ export interface InterviewRepository {
   getAnalysis(owner: string, id: string): Promise<Analysis | null>;
   listMessages(owner: string, id: string): Promise<StoredMessage[]>;
   listDictionary(owner: string): Promise<DictionaryEntry[]>;
+  saveProfileVector(owner: string, vector: number[]): Promise<void>;
   saveAnalysis(owner: string, id: string, analysis: Analysis, lastMessageId: string | null): Promise<void>;
   appendMessage(owner: string, id: string, message: ChatMessage & { audio_url?: string | null }): Promise<string>;
   addCase(owner: string, item: SensoryCase): Promise<void>;

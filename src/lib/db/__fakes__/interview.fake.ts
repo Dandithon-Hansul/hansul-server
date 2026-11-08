@@ -10,10 +10,13 @@ export class FakeInterviewRepository implements InterviewRepository {
   dictionary: DictionaryEntry[] = [];
   confirmedCount = 0;
   publishCalls = 0;
+  profileVector: number[] | null = null;
+  vectorOwner: string | null = null;
   async getRecipe(owner: string, id: string) { return owner === this.recipe.transmitter_id && id === this.recipe.id ? this.recipe : null; }
   async getAnalysis() { return this.analysis; }
   async listMessages() { return [...this.messages]; }
   async listDictionary() { return this.dictionary; }
+  async saveProfileVector(owner: string, vector: number[]) { this.vectorOwner = owner; this.profileVector = vector; }
   async saveAnalysis(_owner: string, _id: string, a: Analysis) { this.analysis = a; }
   async appendMessage(_owner: string, _id: string, message: ChatMessage & { audio_url?: string | null }) {
     const id = `message-${this.messages.length + 1}`; this.messages.push({ ...message, id }); return id;

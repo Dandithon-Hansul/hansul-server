@@ -163,15 +163,16 @@ analyze가 돌려면 `recipes`(draft) + `transcript`가 필요하다. S-03는 �
 
 사용자가 제공한 인터뷰 프롬프트 전문을 src/lib/ai/interview-prompt.ts에 보존했다. 원문과 저장된 문자열의 SHA-256 일치를 확인하고 회귀 테스트로 고정했다.
 
-구현한 경로는 POST /api/analyze, POST /api/chat, POST /api/recipes다. 분석은 전체 인터뷰 결과를 내부에 보존하며 공개 응답은 별도 DTO로 제한한다. 채팅은 텍스트·문장별 TTS SSE, 답변 근거가 있는 문맥별 감각 사례 축적, 대화 후 재분석을 포함한다. 발행은 소유자·확정 사례·구조화·P0 불확실성을 검사하고 DB에서 멱등 처리한다.
+구현한 경로는 POST /api/analyze, POST /api/chat, POST /api/recipes, POST /api/sensory/vectorize다. 분석은 전체 인터뷰 결과를 내부에 보존하며 공개 응답은 별도 DTO로 제한한다. 채팅은 텍스트·문장별 TTS SSE, 답변 근거가 있는 문맥별 감각 사례 축적, 대화 후 재분석을 포함한다. 발행은 소유자·확정 사례·구조화·P0 불확실성을 검사하고 DB에서 멱등 처리한다.
 
-검증 결과: Vitest 48개, 타입 검사, 린트, Next.js 운영 빌드 통과. PGlite + pgvector의 폐기 가능한 로컬 DB에서 공통 기본 스키마와 S-04 마이그레이션을 실제 실행했다. supabase/tests/s04_interview.sql은 타인 접근 거부, 오래된 분석 거부, 원문 보존, 기존 카드 필드 호환, 미확정 발행 거부, 새 메시지 이후 재분석 요구, 발행 멱등과 공개 전환, 일반 사용자 권한 차단을 검증한다. auth/storage는 최소 스키마로 대체했으므로 실제 Supabase Storage·PostgREST·RLS 배포 검증을 대신하지 않는다.
+검증 결과: Vitest 59개, 타입 검사, 린트, Next.js 운영 빌드 통과. PGlite + pgvector의 폐기 가능한 로컬 DB에서 공통 기본 스키마와 S-04 마이그레이션을 실제 실행했다. supabase/tests/s04_interview.sql은 타인 접근 거부, 오래된 분석 거부, 원문 보존, 기존 카드 필드 호환, 미확정 발행 거부, 새 메시지 이후 재분석 요구, 발행 멱등과 공개 전환, 일반 사용자 권한 차단을 검증한다. auth/storage는 최소 스키마로 대체했으므로 실제 Supabase Storage·PostgREST·RLS 배포 검증을 대신하지 않는다.
 
 아직 완료되지 않은 항목:
-- POST /api/sensory/vectorize 응답의 dimensions 척도와 null 허용 여부는 사용자 확인 대기다. 임의 숫자나 confidence를 맛 강도로 내보내지 않는다.
 - 원격 Supabase 마이그레이션 적용과 실제 Claude/OpenAI/Storage 연동은 필수 환경변수 미설정으로 실행하지 않았다.
 - 기본 테이블·vector 확장은 다른 기능 브랜치의 공통 마이그레이션 병합에 의존한다. 온보딩 role 제거 결정과의 통합 순서를 확인해야 한다.
 - 이미지 소유자 경로·객체 크기·형식·레시피 소유권을 검증한다. 업로드 발급 기록과 해당 레시피의 연결을 검증하는 공통 계약은 현재 S-03 업로드 코드에 없으므로 팀 통합 시 추가해야 한다.
 - PR #9는 Draft 상태를 유지한다. 검증 결과를 PR 본문에 게시하거나 Ready로 바꾸는 작업은 아직 하지 않았다.
 
 로컬 테스트 도구에서 발견된 취약점은 Vitest 4.1.12 갱신으로 critical 0개가 됐다. 남은 audit 항목은 moderate 8개이며 이번 작업에서 무관한 의존성을 강제 갱신하지 않았다.
+
+2026-11-08 사용자의 null 반환 승인에 따라 벡터화 API를 연결했다. 확정 사례가 없으면 422, 프로필이 없으면 404이며, 저장 실패를 성공으로 반환하지 않는다. 정규화된 맛 강도 확인값이 없는 현재 스키마에서는 5개 차원이 모두 null이다.

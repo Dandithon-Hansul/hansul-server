@@ -582,11 +582,11 @@ Response 200:
   {
     profile_summary: string,
     dimensions: {
-      salt_intensity:      number,
-      liquid_reduction:    number,
-      sweet_ratio:         number,
-      browning_preference: number,
-      spice_tolerance:     number
+      salt_intensity:      number | null,
+      liquid_reduction:    number | null,
+      sweet_ratio:         number | null,
+      browning_preference: number | null,
+      spice_tolerance:     number | null
     },
     vector_updated: boolean
   }
@@ -596,6 +596,8 @@ Error:
 ```
 
 ---
+
+> 미확인 차원은 `null`이다(2026-11-08 사용자 승인). 현재 정규화된 맛 강도 확인값은 저장하지 않으므로 5개 차원 모두 `null`을 반환한다. 수량이나 confidence를 맛 강도로 바꾸지 않는다. 프로필 벡터는 인증된 전승자의 확정 감각 사례 요약을 임베딩한 1536차원 값이며, 원본 벡터는 응답에 포함하지 않는다.
 
 ## 10. 지역 지도
 

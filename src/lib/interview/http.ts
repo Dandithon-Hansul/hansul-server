@@ -6,6 +6,7 @@ import type { TtsPort } from "../ai/tts";
 import { analyzeRecipe, requireRecipe } from "../services/analyze";
 import { chatRecipe } from "../services/chat";
 import { publishRecipe } from "../services/publish";
+import { vectorizeProfile } from "../services/vectorize";
 import { InterviewError } from "../services/errors";
 import { recipeError, recipeJson } from "../recipes/http";
 import { sse } from "../sse";
@@ -35,6 +36,10 @@ export function createInterviewHandlers(d: InterviewDependencies) {
     },
     async publish(request: Request) {
       try { const user = owner(); const input = await body(request, recipeInput); return recipeJson(await publishRecipe(d.repo, user, input.recipe_id)); }
+      catch (error) { return interviewFailure(error); }
+    },
+    async vectorize(request: Request) {
+      try { const user = owner(); await body(request, z.object({}).strict()); return recipeJson(await vectorizeProfile(d.repo, d.embedding, user)); }
       catch (error) { return interviewFailure(error); }
     },
     async chat(request: Request) {

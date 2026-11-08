@@ -47,6 +47,11 @@ export class SupabaseInterviewRepository implements InterviewRepository {
       confirmations: rows.filter(e => e.expression === row.expression && e.dimension === row.dimension && e.context === row.context && e.food_name === row.food_name && e.resolved_value === row.resolved_value).length,
     }));
   }
+  async saveProfileVector(owner: string, vector: number[]) {
+    const { data, error } = await this.db.from("profiles").update({ sensory_vector: JSON.stringify(vector), updated_at: new Date().toISOString() }).eq("id", owner).select("id").maybeSingle();
+    check(error);
+    if (!data) throw new InterviewError(404, "PROFILE_NOT_FOUND", "프로필을 먼저 설정해 주세요");
+  }
   async saveAnalysis(owner: string, id: string, a: Analysis, lastMessageId: string | null) {
     const { error } = await this.db.rpc("s04_save_analysis", { p_owner: owner, p_recipe: id, p_analysis: a, p_last_message: lastMessageId }); check(error);
   }
