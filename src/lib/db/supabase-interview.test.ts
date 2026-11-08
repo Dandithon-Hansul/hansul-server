@@ -31,3 +31,15 @@ describe("chat image access", () => {
     expect(bucket.createSignedUrl).toHaveBeenCalledWith(path, 900);
   });
 });
+
+describe("published recipe voice", () => {
+  it("저장된 음성 경로를 짧은 서명 URL로 바꿔 반환한다", async () => {
+    const bucket = { createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed.test/voice" }, error: null }) };
+    const repo = new SupabaseInterviewRepository({
+      from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { context_summary: "가족 식사", voice_message_url: `${owner}/recipe/message.webm` }, error: null }) }) }) }),
+      storage: { from: () => bucket },
+    } as unknown as SupabaseClient);
+    vi.spyOn(repo, "getRecipe").mockResolvedValue({ id: "recipe", transmitter_id: owner, status: "published", visibility: "public", transcript: null });
+    expect((await repo.publishedResult(owner, "recipe")).voice_message_url).toBe("https://signed.test/voice");
+  });
+});

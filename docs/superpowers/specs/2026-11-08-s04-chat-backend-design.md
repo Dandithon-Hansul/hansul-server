@@ -165,7 +165,7 @@ analyze가 돌려면 `recipes`(draft) + `transcript`가 필요하다. S-03는 �
 
 구현한 경로는 POST /api/analyze, POST /api/chat, POST /api/recipes다. 분석은 전체 인터뷰 결과를 내부에 보존하며 공개 응답은 별도 DTO로 제한한다. 채팅은 텍스트·문장별 TTS SSE, 답변 근거가 있는 문맥별 감각 사례 축적, 대화 후 재분석을 포함한다. 발행은 소유자·확정 사례·구조화·P0 불확실성을 검사하고 DB에서 멱등 처리한다.
 
-검증 결과: Vitest 47개, 타입 검사, 린트, Next.js 운영 빌드 통과. PGlite + pgvector의 폐기 가능한 로컬 DB에서 공통 기본 스키마와 S-04 마이그레이션을 실제 실행했다. supabase/tests/s04_interview.sql은 타인 접근 거부, 오래된 분석 거부, 원문 보존, 기존 카드 필드 호환, 미확정 발행 거부, 새 메시지 이후 재분석 요구, 발행 멱등과 공개 전환, 일반 사용자 권한 차단을 검증한다. auth/storage는 최소 스키마로 대체했으므로 실제 Supabase Storage·PostgREST·RLS 배포 검증을 대신하지 않는다.
+검증 결과: Vitest 48개, 타입 검사, 린트, Next.js 운영 빌드 통과. PGlite + pgvector의 폐기 가능한 로컬 DB에서 공통 기본 스키마와 S-04 마이그레이션을 실제 실행했다. supabase/tests/s04_interview.sql은 타인 접근 거부, 오래된 분석 거부, 원문 보존, 기존 카드 필드 호환, 미확정 발행 거부, 새 메시지 이후 재분석 요구, 발행 멱등과 공개 전환, 일반 사용자 권한 차단을 검증한다. auth/storage는 최소 스키마로 대체했으므로 실제 Supabase Storage·PostgREST·RLS 배포 검증을 대신하지 않는다.
 
 아직 완료되지 않은 항목:
 - POST /api/sensory/vectorize 응답의 dimensions 척도와 null 허용 여부는 사용자 확인 대기다. 임의 숫자나 confidence를 맛 강도로 내보내지 않는다.

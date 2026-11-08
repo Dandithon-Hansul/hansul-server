@@ -4,6 +4,7 @@ import { z } from "zod";
 import { analysisSchema, type Analysis } from "../ai/analysis";
 import type { ChatMessage, DictionaryEntry } from "../ai/claude";
 import type { InterviewRepository, InterviewRecipe, PublishResult, SensoryCase, StoredMessage } from "./interview";
+import { recipeMediaUrl } from "../recipes/media";
 import { InterviewError } from "../services/errors";
 
 function check(error: { message: string } | null) {
@@ -61,12 +62,15 @@ export class SupabaseInterviewRepository implements InterviewRepository {
     const { count, error } = await this.db.from("sensory_cases").select("id", { count: "exact", head: true }).eq("recipe_id", id).eq("transmitter_id", owner); check(error); return count ?? 0;
   }
   async publish(owner: string, id: string, expectedAnalysis: Analysis): Promise<PublishResult> {
-    const { data, error } = await this.db.rpc("s04_publish", { p_owner: owner, p_recipe: id, p_analysis: expectedAnalysis }); check(error); return publishSchema.parse(data);
+    const { data, error } = await this.db.rpc("s04_publish", { p_owner: owner, p_recipe: id, p_analysis: expectedAnalysis }); check(error); return this.withVoice(owner, id, publishSchema.parse(data));
   }
   async publishedResult(owner: string, id: string): Promise<PublishResult> {
     await this.requireOwned(owner, id);
     const { data, error } = await this.db.from("transmission_cards").select("context_summary,voice_message_url").eq("recipe_id", id).maybeSingle(); check(error);
-    return publishSchema.parse({ recipe_id: id, status: "published", context_summary: data?.context_summary ?? "", voice_message_url: data?.voice_message_url ?? null });
+    return this.withVoice(owner, id, publishSchema.parse({ recipe_id: id, status: "published", context_summary: data?.context_summary ?? "", voice_message_url: data?.voice_message_url ?? null }));
+  }
+  private async withVoice(owner: string, id: string, result: PublishResult) {
+    return { ...result, voice_message_url: await recipeMediaUrl(this.db, result.voice_message_url, "card-voice", `${owner}/${id}`) };
   }
   async storeAudio(owner: string, id: string, name: string, audio: Buffer) {
     await this.requireOwned(owner, id);
