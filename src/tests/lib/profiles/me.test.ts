@@ -47,4 +47,20 @@ describe("profilePatchSchema", () => {
   it("dong이 빈 문자열이면 실패", () => {
     expect(profilePatchSchema.safeParse({ dong: "" }).success).toBe(false);
   });
+
+  it("avatar_url에 storage path를 허용한다", () => {
+    expect(profilePatchSchema.safeParse({ avatar_url: "user-id/avatar/uuid.jpg" }).success).toBe(true);
+  });
+
+  it("avatar_url에 https URL을 허용한다", () => {
+    expect(profilePatchSchema.safeParse({ avatar_url: "https://example.com/avatar.jpg" }).success).toBe(true);
+  });
+
+  it("avatar_url이 빈 문자열이면 실패", () => {
+    expect(profilePatchSchema.safeParse({ avatar_url: "" }).success).toBe(false);
+  });
+
+  it("avatar_url을 null로 설정할 수 있다", () => {
+    expect(profilePatchSchema.safeParse({ avatar_url: null }).success).toBe(true);
+  });
 });

@@ -10,7 +10,7 @@ export const profilePatchSchema = z.strictObject({
   region_code: z.string().regex(/^\d{5}$/).optional(),
   dong: z.string().trim().min(1).max(50).nullable().optional(),
   food_preferences: z.array(z.string().trim().min(1).max(50)).max(30).optional(),
-  avatar_url: z.url({ protocol: /^https$/ }).nullable().optional(),
+  avatar_url: z.string().trim().min(1).max(500).nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0);
 
 const cursorSchema = z.object({
@@ -105,9 +105,10 @@ export async function readProfile(db: Database, id: string) {
     page = result.data;
   }
 
-  const { region, region_code, dong, ...rest } = profile;
+  const { region, region_code, dong, avatar_url, ...rest } = profile;
   return profileJson({
     ...rest,
+    avatar_url: await recipeMediaUrl(db, avatar_url, "uploads", `${id}/avatar`),
     region: regionDto(region_code, region, dong ?? null),
     stats: { transmitted_recipes: transmitted, saved_recipes: saved.count ?? 0, likes_received: likes },
   });
