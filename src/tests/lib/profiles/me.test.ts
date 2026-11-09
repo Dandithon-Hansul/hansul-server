@@ -1,12 +1,6 @@
 import { describe, it, expect } from "vitest";
 
 vi.mock("@/lib/supabase/server");
-vi.mock("@/lib/map/regions", () => ({
-  mapRegions: [
-    { region_code: "47170", region: "안동시", sido: "경북" },
-    { region_code: "27110", region: "중구", sido: "대구" },
-  ],
-}));
 
 import { vi } from "vitest";
 import { regionDto, profilePatchSchema } from "@/lib/profiles/me";
@@ -32,6 +26,12 @@ describe("regionDto", () => {
 
   it("대구 region_code면 sido가 대구광역시", () => {
     expect(regionDto("27110", "중구", null)).toMatchObject({ sido: "대구광역시" });
+  });
+
+  it("대구 전체 코드는 시군구 없이 반환한다", () => {
+    expect(regionDto("27000", "대구광역시", null)).toEqual({
+      code: "27000", sido: "대구광역시", sigungu: null, dong: null,
+    });
   });
 
   it("code와 name이 모두 null이면 null 반환", () => {

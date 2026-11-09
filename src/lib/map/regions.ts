@@ -35,7 +35,14 @@ const gyeongbuk = {
   "47940": "울릉군",
 };
 
+export const daeguRegion = { region_code: "27000", region: "대구광역시", sido: "대구" as const };
+
 export const mapRegions = [
+  daeguRegion,
   ...Object.entries(daegu).map(([region_code, region]) => ({ region_code, region, sido: "대구" as const })),
   ...Object.entries(gyeongbuk).map(([region_code, region]) => ({ region_code, region, sido: "경북" as const })),
 ];
+
+export const mapDisplayRegions = mapRegions.filter(
+  (region) => region.sido !== "대구" || region.region_code === daeguRegion.region_code,
+);
