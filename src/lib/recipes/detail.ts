@@ -59,37 +59,75 @@ export function isRecipeSeedMode() {
   return process.env.RECIPE_DETAIL_SEED_MODE === "true" && process.env.VERCEL_ENV !== "production";
 }
 
+const RECIPE_DETAIL_SELECT = `
+  id, title, hero_image_url, transmitter_id, region, region_code, transmitter_quote,
+  cooking_time, difficulty, servings, like_count, save_count, ingredients, steps,
+  version, updated_at, status, visibility,
+  transmitter:profiles!transmitter_id(display_name),
+  card:transmission_cards(context_summary, voice_message_url)
+`;
+
+interface RecipeDetailRow {
+  id: string;
+  title: string | null;
+  hero_image_url: string | null;
+  transmitter_id: string;
+  region: string | null;
+  region_code: string | null;
+  transmitter_quote: string | null;
+  cooking_time: number | null;
+  difficulty: string | null;
+  servings: number | null;
+  like_count: number;
+  save_count: number;
+  ingredients: unknown;
+  steps: unknown;
+  version: number;
+  updated_at: string;
+  status: string;
+  visibility: string;
+  transmitter: { display_name: string | null } | { display_name: string | null }[] | null;
+  card:
+    | { context_summary: string | null; voice_message_url: string | null }
+    | { context_summary: string | null; voice_message_url: string | null }[]
+    | null;
+}
+
 export async function getRecipeDetail(id: string, userId: string | null) {
   if (isRecipeSeedMode() && !userId) {
     return id === seedRecipeId ? { status: "ok" as const, recipe: seedRecipe } : { status: "missing" as const };
   }
 
   const db = createSupabaseAdminClient();
-  const { data: row, error } = await db
+  const { data, error } = await db
     .from("recipes")
-    .select("id,title,hero_image_url,transmitter_id,region,region_code,transmitter_quote,cooking_time,difficulty,servings,like_count,save_count,ingredients,steps,version,updated_at,status,visibility")
+    .select(RECIPE_DETAIL_SELECT)
     .eq("id", id)
     .maybeSingle();
+
   if (error) throw error;
-  if (!row) return { status: "missing" as const };
+  if (!data) return { status: "missing" as const };
+
+  const row = data as unknown as RecipeDetailRow;
+
   if (!userId || (row.transmitter_id !== userId && (row.status !== "published" || row.visibility !== "public"))) {
     return { status: "forbidden" as const };
   }
 
-  const [profile, card, like, save] = await Promise.all([
-    db.from("profiles").select("display_name").eq("id", row.transmitter_id).single(),
-    db.from("transmission_cards").select("context_summary,voice_message_url").eq("recipe_id", id).maybeSingle(),
+  const [like, save] = await Promise.all([
     db.from("recipe_likes").select("recipe_id").eq("recipe_id", id).eq("profile_id", userId).maybeSingle(),
     db.from("recipe_saves").select("recipe_id").eq("recipe_id", id).eq("profile_id", userId).maybeSingle(),
   ]);
-  for (const result of [profile, card, like, save]) {
-    if (result.error) throw result.error;
-  }
+  if (like.error) throw like.error;
+  if (save.error) throw save.error;
+
+  const transmitter = Array.isArray(row.transmitter) ? row.transmitter[0] : row.transmitter;
+  const card = Array.isArray(row.card) ? row.card[0] : row.card;
 
   const ownerPath = row.transmitter_id + "/" + id;
   const [heroImageUrl, voiceMessageUrl, steps] = await Promise.all([
     recipeMediaUrl(db, row.hero_image_url, "recipe-images", ownerPath),
-    recipeMediaUrl(db, card.data?.voice_message_url, "card-voice", ownerPath),
+    recipeMediaUrl(db, card?.voice_message_url, "card-voice", ownerPath),
     Promise.all((row.steps as Step[]).slice().sort((a, b) => a.order - b.order)
       .map(async ({ order, title, description, image_url, tip, is_key_step }) => ({
         order,
@@ -108,9 +146,9 @@ export async function getRecipeDetail(id: string, userId: string | null) {
       title: row.title,
       hero_image_url: heroImageUrl,
       transmitter_id: row.transmitter_id,
-      transmitter_name: profile.data!.display_name,
+      transmitter_name: transmitter?.display_name ?? "",
       transmitter_quote: row.transmitter_quote,
-      context_summary: card.data?.context_summary ?? "",
+      context_summary: card?.context_summary ?? "",
       voice_message_url: voiceMessageUrl,
       cooking_time: row.cooking_time,
       difficulty: row.difficulty,

@@ -21,9 +21,15 @@ describe("chatRecipe", () => {
     vi.spyOn(tts, "synthesize").mockImplementation(async () => { await gate; return Buffer.from("mp3"); });
     vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => { chunk("첫 문장. "); chunk("둘째 문장?"); release(); return "첫 문장. 둘째 문장?"; });
     const frames: string[] = [];
-    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, s => frames.push(s));
+    const background: (() => Promise<void>)[] = [];
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, s => frames.push(s), undefined, task => background.push(task));
     expect(frames.slice(0, 2).every(f => f.startsWith("event: chunk"))).toBe(true);
     expect(frames.filter(f => f.startsWith("event: audio")).map(f => JSON.parse(f.split("data: ")[1]).sequence)).toEqual([1, 2]);
+    expect(frames.at(-1)).toContain('"audio_url":null');
+    expect(repo.messages[1].audio_url).toBeNull();
+    expect(tts.synthesize).toHaveBeenCalledTimes(2);
+    expect(background).toHaveLength(1);
+    await background[0]();
     expect(repo.messages[1].audio_url).toContain("full");
   });
   it("한 청크 안의 여러 문장과 청크 사이 소수점을 구분한다", async () => {
@@ -32,8 +38,11 @@ describe("chatRecipe", () => {
     vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => {
       chunk("소금 0."); chunk("5g이에요. 다음 문장. 마지막 문장?"); return "소금 0.5g이에요. 다음 문장. 마지막 문장?";
     });
-    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, () => {});
-    expect(synth.mock.calls.map(c => c[0])).toEqual(["소금 0.5g이에요.", "다음 문장.", "마지막 문장?", "소금 0.5g이에요. 다음 문장. 마지막 문장?"]);
+    const background: (() => Promise<void>)[] = [];
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, () => {}, undefined, task => background.push(task));
+    expect(synth.mock.calls.map(c => c[0])).toEqual(["소금 0.5g이에요.", "다음 문장.", "마지막 문장?"]);
+    await background[0]();
+    expect(synth.mock.calls.at(-1)?.[0]).toBe("소금 0.5g이에요. 다음 문장. 마지막 문장?");
   });
   it("이미지 소유권 확인 실패 시 메시지를 저장하지 않는다", async () => {
     const repo = new FakeInterviewRepository(); vi.spyOn(repo, "resolveImage").mockRejectedValue(new Error("forbidden"));

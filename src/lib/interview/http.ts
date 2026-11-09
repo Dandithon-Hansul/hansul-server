@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { after } from "next/server";
 import type { InterviewRepository } from "../db/interview";
 import type { ClaudePort } from "../ai/claude";
 import type { EmbeddingPort } from "../ai/embedding";
@@ -54,7 +55,7 @@ export function createInterviewHandlers(d: InterviewDependencies) {
         const stream = new ReadableStream<Uint8Array>({
           async start(controller) {
             const send = (frame: string) => { if (!abort.signal.aborted) controller.enqueue(encoder.encode(frame)); };
-            try { await chatRecipe(d.repo, d.ai, d.tts, d.embedding, user, input, send, abort.signal); }
+            try { await chatRecipe(d.repo, d.ai, d.tts, d.embedding, user, input, send, abort.signal, task => after(task)); }
             catch (error) { send(sse("error", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED", message: "답변 처리를 완료하지 못했습니다. 다시 시도해 주세요" })); }
             finally { request.signal.removeEventListener("abort", onAbort); if (!abort.signal.aborted) controller.close(); }
           },
