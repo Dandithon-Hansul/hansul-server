@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createInterviewHandlers } from "./http";
 import { FakeInterviewRepository } from "../db/__fakes__/interview.fake";
 import { FakeClaude } from "../ai/__fakes__/claude.fake";
@@ -48,6 +48,20 @@ describe("interview HTTP", () => {
     const r = await setup().chat(req({ recipe_id: id, message: "설명해 주세요" }));
     expect(r.headers.get("content-type")).toContain("text/event-stream");
     const frames = await r.text(); expect(frames).toContain("event: done\ndata: "); expect(frames).not.toContain("event: audio");
+  });
+  it("레시피가 없으면 SSE 스트림에서 에러 이벤트를 반환한다", async () => {
+    const unknownId = "00000000-0000-4000-8000-000000000000";
+    const r = await setup().chat(req({ recipe_id: unknownId, message: "테스트" }));
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("text/event-stream");
+    expect(await r.text()).toContain("event: error");
+  });
+  it("정상 채팅에서 레시피를 한 번만 조회한다", async () => {
+    const repo = new FakeInterviewRepository();
+    const getRecipe = vi.spyOn(repo, "getRecipe");
+    const r = await setup("owner", repo).chat(req({ recipe_id: id, message: "설명해 주세요" }));
+    expect(getRecipe).toHaveBeenCalledTimes(1);
+    await r.text();
   });
   it("벡터화는 인증이 필요하며 확정 사례가 없으면 422이다", async () => {
     expect((await setup(null).vectorize(req({}))).status).toBe(401);

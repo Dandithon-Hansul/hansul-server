@@ -5,6 +5,7 @@ import { toPopularCard } from "@/lib/dto/recipe";
 import { parseLimit } from "@/lib/query";
 import { interviewDependencies } from "@/lib/interview/dependencies";
 import { createInterviewHandlers, interviewFailure } from "@/lib/interview/http";
+import { resolveRecipeHeroImages } from "@/lib/recipes/media";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,8 @@ export async function GET(request: Request) {
     const client = createSupabaseAdminClient();
     const rows = await fetchRecipeList(client, { regionCode, limit, sort });
 
-    return recipeJson({ recipes: rows.map(toPopularCard), next_cursor: null });
+    const resolved = await resolveRecipeHeroImages(client, rows);
+    return recipeJson({ recipes: resolved.map(toPopularCard), next_cursor: null });
   } catch {
     return recipeError(500, "recipe_list_unavailable", "레시피 목록을 불러오지 못했습니다.");
   }

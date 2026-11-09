@@ -3,6 +3,7 @@ import { getRecipeViewer, recipeJson, recipeError } from "@/lib/recipes/http";
 import { buildHomeResponse } from "@/lib/home-response";
 import { fetchRecipeList, fetchViewer, fetchInteractions, fetchMonthlyTop } from "@/lib/repositories/recipes";
 import { parseLimit } from "@/lib/query";
+import { recipeMediaUrl } from "@/lib/recipes/media";
 
 const TOP_LIMIT = 6;
 
@@ -21,6 +22,8 @@ export async function GET(request: Request) {
           fetchRecipeList(client, { regionCode, limit, sort: "popular" }),
         fetchViewer: (id) => fetchViewer(client, id),
         fetchInteractions: (id, ids) => fetchInteractions(client, id, ids),
+        resolveHeroImageUrl: (url, tid, rid) =>
+          recipeMediaUrl(client, url, "recipe-images", `${tid}/${rid}`),
       },
       { userId, limit, topLimit: TOP_LIMIT },
     );

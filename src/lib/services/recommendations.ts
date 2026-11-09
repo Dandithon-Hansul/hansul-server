@@ -7,6 +7,7 @@ import {
   type RecommendationRow,
 } from "@/lib/repositories/recommendations";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { resolveRecipeHeroImages } from "@/lib/recipes/media";
 
 export const recommendationLimitSchema = z.coerce.number().int().min(1).max(10).default(10);
 
@@ -36,13 +37,13 @@ export async function getRecommendedRecipes(userId: string, limit: number) {
     getPublishedRecipes(db),
   ]);
 
-  return recipes
+  const selected = recipes
     .sort((a, b) => {
       const preferenceOrder = Number(matchesPreference(b, preferences)) - Number(matchesPreference(a, preferences));
       return preferenceOrder || b.like_count - a.like_count || b.created_at.localeCompare(a.created_at);
     })
-    .slice(0, limit)
-    .map((recipe) => ({
+    .slice(0, limit);
+  return (await resolveRecipeHeroImages(db, selected)).map((recipe) => ({
       recipe_id: recipe.id,
       title: recipe.title,
       hero_image_url: recipe.hero_image_url,

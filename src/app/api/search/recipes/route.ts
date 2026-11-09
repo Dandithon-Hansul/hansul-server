@@ -3,6 +3,7 @@ import { recipeJson, recipeError } from "@/lib/recipes/http";
 import { searchRecipes } from "@/lib/repositories/recipes";
 import { toSearchCard } from "@/lib/dto/recipe";
 import { parseLimit } from "@/lib/query";
+import { resolveRecipeHeroImages } from "@/lib/recipes/media";
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +15,8 @@ export async function GET(request: Request) {
     const client = createSupabaseAdminClient();
     const rows = await searchRecipes(client, { q, regionCode, limit });
 
-    return recipeJson({ recipes: rows.map(toSearchCard), next_cursor: null });
+    const resolved = await resolveRecipeHeroImages(client, rows);
+    return recipeJson({ recipes: resolved.map(toSearchCard), next_cursor: null });
   } catch {
     return recipeError(500, "search_unavailable", "검색에 실패했습니다.");
   }
