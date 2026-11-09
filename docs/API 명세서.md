@@ -10,6 +10,7 @@
 | 메서드 | 경로 | 역할 |
 | --- | --- | --- |
 | `GET` | `/api/profiles/me` | 내 프로필 조회 |
+| `GET` | `/api/profiles/:id` | 레시피 작성자의 공개 프로필 조회 |
 | `PATCH` | `/api/profiles/me` | 이름·지역·프로필 사진 수정 |
 | `POST` | `/api/profiles/setup` | 온보딩 기본 정보 저장 |
 | `GET` | `/api/home` | 홈 피드 (인사말 + 이달의 TOP + 개인화 추천 통합) |
@@ -28,7 +29,7 @@
 | `GET` | `/api/profiles/me/recipes` | 내가 전승한 레시피 목록 |
 | `GET` | `/api/profiles/me/saved` | 저장한 레시피 목록 |
 | `GET` | `/api/recommendations` | 개인화 추천 (food_preferences 기반) |
-| `GET` | `/api/map/regions` | 대구·경북 지역 목록 (시·군 단위) |
+| `GET` | `/api/map/regions` | 대구광역시 전체 및 경북 시·군 목록 |
 | `GET` | `/api/map/regions/:region_code/recipes` | 선택 지역 인기 레시피 목록 |
 
 ---
@@ -444,6 +445,8 @@ Error:
 
 ---
 
+> 레시피의 transmitter_id로 작성자 공개 프로필을 조회한다. avatar_url은 표시용 URL이며, 저장한 레시피 목록과 통계는 본인 마이페이지에서만 제공한다.
+
 ## 8-1. 좋아요·저장
 
 ```
@@ -495,6 +498,8 @@ Error:
 ---
 
 ## 10. 지역 지도
+
+> 대구는 지도 목록에서 27000(대구광역시)으로 한 번만 표시한다. 대구의 레시피 수와 27000 상세 조회는 27로 시작하는 모든 공개 발행 레시피를 포함한다. 경북은 기존 시·군 단위를 사용한다.
 
 ```
 GET /api/map/regions

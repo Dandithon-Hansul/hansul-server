@@ -46,7 +46,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           ),
         })),
     );
-    return recipeJson({ ...data, recipes });
+    const avatarUrl = await recipeMediaUrl(db, data.avatar_url, "uploads", `${id.data}/avatar`);
+    return recipeJson({ ...data, avatar_url: avatarUrl, recipes });
   } catch {
     return recipeError(500, "INTERNAL_ERROR", "전승자 정보를 불러오지 못했습니다.");
   }
