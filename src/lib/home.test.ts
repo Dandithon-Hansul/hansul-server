@@ -5,6 +5,7 @@ import type { RawRecipeRow } from "./dto/recipe";
 function row(id: string, regionCode: string | null): RawRecipeRow {
   return {
     id,
+    transmitter_id: "owner",
     title: id,
     hero_image_url: null,
     transmitter_quote: null,

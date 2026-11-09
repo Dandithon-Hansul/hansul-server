@@ -101,6 +101,23 @@ describe("media url utilities", () => {
   });
 
   describe("resolveRecipeHeroImages", () => {
+    it("레시피별 소유 경로를 서명 URL로 변환하고 파일명만 있는 값은 null로 처리한다", async () => {
+      const { db, createSignedUrls } = createMockDb();
+      const rows = [
+        { id: "recipe-1", transmitter_id: "owner-1", hero_image_url: "recipe-images/owner-1/recipe-1/hero.webp" },
+        { id: "recipe-2", transmitter_id: "owner-2", hero_image_url: "hero.webp" },
+      ];
+
+      const resolved = await resolveRecipeHeroImages(db, rows);
+
+      expect(resolved.map((row) => row.hero_image_url)).toEqual([
+        "https://mock.storage/owner-1/recipe-1/hero.webp?token=batch_abc",
+        null,
+      ]);
+      expect(createSignedUrls).toHaveBeenCalledOnce();
+      expect(createSignedUrls).toHaveBeenCalledWith(["owner-1/recipe-1/hero.webp"], 600);
+    });
+
     it("resolves all recipe hero images using batch API", async () => {
       const { db, createSignedUrls } = createMockDb();
 
