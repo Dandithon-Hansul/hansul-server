@@ -10,6 +10,7 @@ export const profilePatchSchema = z.strictObject({
   region_code: z.string().regex(/^\d{5}$/).optional(),
   dong: z.string().trim().min(1).max(50).nullable().optional(),
   food_preferences: z.array(z.string().trim().min(1).max(50)).max(30).optional(),
+  bio: z.string().trim().max(50).nullable().optional(),
   avatar_url: z.string().trim().min(1).max(500).nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0);
 
@@ -70,7 +71,7 @@ function nextCursor(rows: { id: string; at: string }[], limit: number) {
   return rows.length > limit ? Buffer.from(JSON.stringify(rows[limit - 1])).toString("base64url") : null;
 }
 
-const fields = "id,display_name,avatar_url,region,region_code,dong";
+const fields = "id,display_name,avatar_url,region,region_code,dong,bio";
 
 export function regionDto(code: string | null, name: string | null, dong: string | null) {
   if (!code && !name) return null;
