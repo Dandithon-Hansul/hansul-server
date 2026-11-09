@@ -27,6 +27,13 @@ describe("interview HTTP", () => {
       voice_message_url: "https://example.test/quote.mp3",
     });
   });
+  it("발행 저장 실패를 분석 오류와 구분할 수 있는 코드로 반환한다", async () => {
+    const repo = new FakeInterviewRepository(); repo.analysis = analysisFixture(); repo.analysis.questions = []; repo.confirmedCount = 1;
+    vi.spyOn(repo, "publish").mockRejectedValue(new Error("INTERVIEW_DATABASE_ERROR"));
+    const r = await setup("owner", repo).publish(req({ recipe_id: id }));
+    expect(r.status).toBe(502);
+    expect(await r.json()).toMatchObject({ code: "INTERVIEW_DATABASE_ERROR" });
+  });
 
   it("미인증 요청은 401이다", async () => {
     expect((await setup(null).analyze(req({ recipe_id: id }))).status).toBe(401);
@@ -48,6 +55,21 @@ describe("interview HTTP", () => {
     const r = await setup().chat(req({ recipe_id: id, message: "설명해 주세요" }));
     expect(r.headers.get("content-type")).toContain("text/event-stream");
     const frames = await r.text(); expect(frames).toContain("event: done\ndata: "); expect(frames).not.toContain("event: audio");
+  });
+  it("채팅 중 AI 실패 시 SSE에 안정적인 오류 코드를 보낸다", async () => {
+    const ai = new FakeClaude();
+    const repo = new FakeInterviewRepository(); repo.recipe.id = id;
+    vi.spyOn(ai, "chatStream").mockRejectedValue(new Error("upstream secret detail"));
+    const handlers = createInterviewHandlers({ userId: "owner", repo, ai, tts: new FakeTts(), embedding: new FakeEmbedding() });
+    const r = await handlers.chat(req({ recipe_id: id, message: "테스트" }));
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain('"code":"INTERVIEW_FAILED"');
+  });
+  it("채팅 메시지 DB 저장 실패를 INTERVIEW_DATABASE_ERROR로 구분한다", async () => {
+    const repo = new FakeInterviewRepository(); repo.recipe.id = id;
+    vi.spyOn(repo, "appendMessage").mockRejectedValue(new Error("INTERVIEW_DATABASE_ERROR"));
+    const r = await setup("owner", repo).chat(req({ recipe_id: id, message: "테스트" }));
+    expect(await r.text()).toContain('"code":"INTERVIEW_DATABASE_ERROR"');
   });
   it("레시피가 없으면 SSE 스트림에서 에러 이벤트를 반환한다", async () => {
     const unknownId = "00000000-0000-4000-8000-000000000000";

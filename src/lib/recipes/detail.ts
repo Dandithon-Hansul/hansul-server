@@ -1,6 +1,6 @@
 import "server-only";
 
-import { recipeMediaUrl } from "./media";
+import { batchRecipeMediaUrls, type MediaItemToResolve } from "./media";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 type Ingredient = {
@@ -125,19 +125,31 @@ export async function getRecipeDetail(id: string, userId: string | null) {
   const card = Array.isArray(row.card) ? row.card[0] : row.card;
 
   const ownerPath = row.transmitter_id + "/" + id;
-  const [heroImageUrl, voiceMessageUrl, steps] = await Promise.all([
-    recipeMediaUrl(db, row.hero_image_url, "recipe-images", ownerPath),
-    recipeMediaUrl(db, card?.voice_message_url, "card-voice", ownerPath),
-    Promise.all((row.steps as Step[]).slice().sort((a, b) => a.order - b.order)
-      .map(async ({ order, title, description, image_url, tip, is_key_step }) => ({
-        order,
-        title,
-        description,
-        image_url: await recipeMediaUrl(db, image_url, "step-images", ownerPath),
-        tip: tip ?? null,
-        is_key_step: is_key_step ?? false,
-      }))),
-  ]);
+  const rawSteps = (row.steps as Step[]).slice().sort((a, b) => a.order - b.order);
+
+  const mediaItems: MediaItemToResolve[] = [
+    { key: "hero", value: row.hero_image_url, bucket: "recipe-images", ownerPath },
+    { key: "voice", value: card?.voice_message_url, bucket: "card-voice", ownerPath },
+    ...rawSteps.map((step, idx) => ({
+      key: `step_${idx}`,
+      value: step.image_url,
+      bucket: "step-images",
+      ownerPath,
+    })),
+  ];
+
+  const urlMap = await batchRecipeMediaUrls(db, mediaItems);
+
+  const heroImageUrl = urlMap.get("hero") ?? null;
+  const voiceMessageUrl = urlMap.get("voice") ?? null;
+  const steps = rawSteps.map(({ order, title, description, tip, is_key_step }, idx) => ({
+    order,
+    title,
+    description,
+    image_url: urlMap.get(`step_${idx}`) ?? null,
+    tip: tip ?? null,
+    is_key_step: is_key_step ?? false,
+  }));
 
   return {
     status: "ok" as const,

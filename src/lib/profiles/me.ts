@@ -81,38 +81,38 @@ export function regionDto(code: string | null, name: string | null, dong: string
   return { code, sido, sigungu: known?.region ?? name, dong };
 }
 
+interface ProfileStats {
+  transmitted_recipes: number;
+  likes_received: number;
+  saved_recipes: number;
+}
+
 export async function readProfile(db: Database, id: string) {
-  const { data: profile, error } = await db.from("profiles").select(fields).eq("id", id).maybeSingle();
-  if (error) throw error;
-  if (!profile) return profileError(404, "PROFILE_NOT_FOUND", "온보딩을 먼저 완료해 주세요.");
-
-  const [recipes, saved] = await Promise.all([
-    db.from("recipes").select("id,like_count").eq("transmitter_id", id).eq("status", "published")
-      .order("id").limit(250),
-    db.from("recipe_saves").select("id,recipes!inner(id)", { count: "exact", head: true })
-      .eq("profile_id", id).eq("recipes.status", "published").eq("recipes.visibility", "public"),
+  const [profileResult, statsResult] = await Promise.all([
+    db.from("profiles").select(fields).eq("id", id).maybeSingle(),
+    db.rpc("get_profile_stats", { p_profile_id: id }),
   ]);
-  if (recipes.error) throw recipes.error;
-  if (saved.error) throw saved.error;
 
-  let page = recipes.data;
-  let transmitted = 0;
-  let likes = 0;
-  while (page.length) {
-    transmitted += page.length;
-    likes += page.reduce((total, recipe) => total + recipe.like_count, 0);
-    const result = await db.from("recipes").select("id,like_count").eq("transmitter_id", id)
-      .eq("status", "published").gt("id", page[page.length - 1].id).order("id").limit(250);
-    if (result.error) throw result.error;
-    page = result.data;
-  }
+  if (profileResult.error) throw profileResult.error;
+  if (!profileResult.data) return profileError(404, "PROFILE_NOT_FOUND", "온보딩을 먼저 완료해 주세요.");
 
-  const { region, region_code, dong, avatar_url, ...rest } = profile;
+  if (statsResult.error) throw statsResult.error;
+  const stats = (statsResult.data ?? {
+    transmitted_recipes: 0,
+    likes_received: 0,
+    saved_recipes: 0,
+  }) as ProfileStats;
+
+  const { region, region_code, dong, avatar_url, ...rest } = profileResult.data;
   return profileJson({
     ...rest,
     avatar_url: await recipeMediaUrl(db, avatar_url, "uploads", `${id}/avatar`),
     region: regionDto(region_code, region, dong ?? null),
-    stats: { transmitted_recipes: transmitted, saved_recipes: saved.count ?? 0, likes_received: likes },
+    stats: {
+      transmitted_recipes: stats.transmitted_recipes,
+      saved_recipes: stats.saved_recipes,
+      likes_received: stats.likes_received,
+    },
   });
 }
 

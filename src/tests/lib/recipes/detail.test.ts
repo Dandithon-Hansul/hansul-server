@@ -6,6 +6,12 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 vi.mock("@/lib/recipes/media", () => ({
+  batchRecipeMediaUrls: vi.fn().mockImplementation((_db, items) =>
+    Promise.resolve(new Map(items.map((item: { key: string; value: string | null }) => [
+      item.key,
+      item.value ? `https://signed.test/${item.value}` : null,
+    ]))),
+  ),
   recipeMediaUrl: vi.fn().mockImplementation((_db, val) => Promise.resolve(val ? `https://signed.test/${val}` : null)),
 }));
 

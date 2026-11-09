@@ -110,4 +110,23 @@ describe("chatRecipe", () => {
     await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "찻숟가락 반 넣어요", tts: false }, () => {});
     expect(repo.cases[0]).toMatchObject({ resolved_value: "찻숟가락 반", evidence: "찻숟가락 반 넣어요", message_id: "message-1" });
   });
+  it("이미지 소유권 확인 실패 시 메시지를 저장하지 않는다", async () => {
+    const repo = new FakeInterviewRepository(); vi.spyOn(repo, "resolveImage").mockRejectedValue(new Error("forbidden"));
+    await expect(chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "사진", image_path: "other/file.png", tts: false }, () => {})).rejects.toThrow();
+    expect(repo.messages).toEqual([]);
+  });
+  it("AI 답변 실패 후 같은 요청을 재시도하면 미완료 사용자 메시지를 재사용한다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude();
+    vi.spyOn(ai, "chatStream").mockRejectedValueOnce(new Error("AI unavailable"));
+    await expect(chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: false }, () => {})).rejects.toThrow();
+    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: false }, () => {});
+    expect(repo.messages.map(m => m.role)).toEqual(["user", "assistant"]);
+  });
+  it("답변 저장 후 분석 실패는 저장된 답변의 완료 이벤트를 막지 않는다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const frames: string[] = [];
+    vi.spyOn(ai, "analyzeJson").mockRejectedValue(new Error("analysis failed"));
+    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: false }, s => frames.push(s));
+    expect(repo.messages.map(m => m.role)).toEqual(["user", "assistant"]);
+    expect(frames.at(-1)).toContain("event: done");
+  });
 });
