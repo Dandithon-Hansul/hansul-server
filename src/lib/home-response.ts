@@ -40,30 +40,34 @@ export async function buildHomeResponse(
   deps: HomeDeps,
   { userId, limit, topLimit }: { userId: string | null; limit: number; topLimit: number },
 ): Promise<HomeResponse> {
-  const viewer = userId ? await deps.fetchViewer(userId) : null;
-
-  const topRows = await deps.fetchMonthlyTop({ limit: topLimit });
-  const top_recipes = await Promise.all(topRows.map(async (r, i) => ({
-    ...toTopCard(r, i + 1),
-    hero_image_url: await deps.resolveHeroImageUrl(r.hero_image_url, r.transmitter_id, r.id),
-  })));
-
-  const pool = await deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL });
+  const [viewer, topRows, pool] = await Promise.all([
+    userId ? deps.fetchViewer(userId) : Promise.resolve(null),
+    deps.fetchMonthlyTop({ limit: topLimit }),
+    deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL }),
+  ]);
   const recRows = selectRecommended(pool, {
     regionCode: viewer?.region_code ?? null,
     excludeIds: new Set(topRows.map((r) => r.id)),
     limit,
   });
 
-  const interactions =
+  const [top_recipes, interactions, recommendedUrls] = await Promise.all([
+    Promise.all(topRows.map(async (r, i) => ({
+      ...toTopCard(r, i + 1),
+      hero_image_url: await deps.resolveHeroImageUrl(r.hero_image_url, r.transmitter_id, r.id),
+    }))),
     userId && recRows.length > 0
-      ? await deps.fetchInteractions(userId, recRows.map((r) => r.id))
-      : EMPTY_INTERACTIONS;
+      ? deps.fetchInteractions(userId, recRows.map((r) => r.id))
+      : Promise.resolve(EMPTY_INTERACTIONS),
+    Promise.all(recRows.map((r) =>
+      deps.resolveHeroImageUrl(r.hero_image_url, r.transmitter_id, r.id),
+    )),
+  ]);
 
-  const recommended = await Promise.all(recRows.map(async (r) => ({
+  const recommended = recRows.map((r, i) => ({
     ...toRecommendedCard(r, interactions),
-    hero_image_url: await deps.resolveHeroImageUrl(r.hero_image_url, r.transmitter_id, r.id),
-  })));
+    hero_image_url: recommendedUrls[i],
+  }));
 
   return {
     greeting_name: viewer?.display_name ?? null,

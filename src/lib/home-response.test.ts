@@ -40,6 +40,26 @@ function makeDeps(overrides: Partial<HomeDeps> = {}): HomeDeps {
 }
 
 describe("buildHomeResponse", () => {
+  it("프로필·월간 TOP·추천 후보 조회를 동시에 시작한다", async () => {
+    let finishMonthlyTop!: (rows: RawRecipeRow[]) => void;
+    const monthlyTop = new Promise<RawRecipeRow[]>((resolve) => { finishMonthlyTop = resolve; });
+    const deps = makeDeps({
+      fetchMonthlyTop: vi.fn(() => monthlyTop),
+    });
+
+    const response = buildHomeResponse(deps, { userId: "u1", limit: 10, topLimit: 2 });
+    const startedTogether = {
+      monthlyTop: vi.mocked(deps.fetchMonthlyTop).mock.calls.length,
+      viewer: vi.mocked(deps.fetchViewer).mock.calls.length,
+      popular: vi.mocked(deps.fetchPopular).mock.calls.length,
+    };
+    finishMonthlyTop(pool.slice(0, 2));
+    await response;
+
+    expect(startedTogether).toEqual({ monthlyTop: 1, viewer: 1, popular: 1 });
+    expect(deps.fetchViewer).toHaveBeenCalledWith("u1");
+  });
+
   it("TOP과 추천 이미지 경로를 응답 URL로 변환한다", async () => {
     const deps = makeDeps({
       fetchMonthlyTop: vi.fn(async () => [{ ...row("top1", null), hero_image_url: "recipe-images/owner/top1/hero.webp" }]),
