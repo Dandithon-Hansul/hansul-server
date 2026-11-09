@@ -37,6 +37,7 @@
 - [환경변수](#️-환경변수)
 - [프로젝트 구조](#-프로젝트-구조)
 - [문서](#-문서)
+- [AI 협업 환경](#-ai-협업-환경)
 
 ---
 
@@ -217,3 +218,44 @@ hansul-server/
 | [ERD](docs/ERD.md) | 데이터베이스 스키마 |
 | [API 명세서](docs/API%20명세서.md) | REST API 상세 명세 |
 | [ADR](docs/decisions/) | 주요 아키텍처 결정 기록 |
+
+---
+
+## 🤖 AI 협업 환경
+
+코드를 작성하기 전에 AI 에이전트용 인프라를 먼저 구성했습니다. 팀원 누구나 같은 도구로 같은 품질 게이트를 통과할 수 있도록 모두 저장소에 체크인되어 있습니다.
+
+### 프로젝트 운영 규칙
+
+| 파일 | 대상 |
+|------|------|
+| [`CLAUDE.md`](CLAUDE.md) | Claude Code |
+| [`AGENTS.md`](AGENTS.md) | Codex 등 기타 AI 에이전트 |
+
+계획 형식, 스코프 제한, 브랜치 전략, TDD 절차, 디버깅 프로토콜, ADR 조건 등 개발 전반의 규칙을 담고 있습니다. AI 에이전트는 이 파일을 읽고 프로젝트 맥락에 맞게 작동합니다.
+
+### 팀 공용 스킬
+
+```
+.agents/skills/self-review/   ← Codex 등 ($self-review)
+.claude/skills/self-review/   ← Claude Code (/self-review)
+```
+
+PR 병합 전 필수 품질 게이트입니다. diff 전체 추적, PR 템플릿 대조, 테스트·정적 검사 실행, 보안 검토를 거쳐 아래 세 가지 중 하나로 판정합니다.
+
+| 판정 | 조건 |
+|------|------|
+| `✅ 셀프 리뷰 통과` | Critical·Important 없음, 검증 근거 있음 |
+| `❌ 수정 필요` | 재현 가능한 결함 또는 요구사항 누락 |
+| `확인 필요` | SHA 불일치, 검증 근거 부족 |
+
+### GitHub 템플릿
+
+```
+.github/PULL_REQUEST_TEMPLATE/default.md    ← 일반 작업 PR (base: develop)
+.github/PULL_REQUEST_TEMPLATE/release.md    ← develop → main 승격 PR
+.github/ISSUE_TEMPLATE/feature_request.md
+.github/ISSUE_TEMPLATE/bug_report.md
+```
+
+PR 템플릿 검증 체크리스트에 `셀프 리뷰 통과` 항목이 포함되어 있습니다. release 템플릿에는 회의 승인 기록 섹션이 별도로 있어, `develop → main` 승격은 사람이 회의에서 결정합니다.
