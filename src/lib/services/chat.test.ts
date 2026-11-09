@@ -40,6 +40,14 @@ describe("chatRecipe", () => {
     await expect(chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "사진", image_path: "other/file.png", tts: false }, () => {})).rejects.toThrow();
     expect(repo.messages).toEqual([]);
   });
+  it("새 이미지 메시지는 서명된 URL로 Claude에 전달한다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude();
+    const chat = vi.spyOn(ai, "chatStream");
+    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "사진", image_path: "owner/recipe/image.png", tts: false }, () => {});
+    expect(chat.mock.calls[0][0].at(-1)).toMatchObject({ image_url: "https://example.test/image.png" });
+    expect(repo.messages[0].image_url).toBe("owner/recipe/image.png");
+  });
   it("listMessages를 Phase 1에서 병렬로 조회한다", async () => {
     const repo = new FakeInterviewRepository();
     let listMessagesCalled = false;
