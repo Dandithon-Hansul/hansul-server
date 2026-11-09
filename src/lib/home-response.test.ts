@@ -5,6 +5,7 @@ import type { RawRecipeRow } from "./dto/recipe";
 function row(id: string, regionCode: string | null): RawRecipeRow {
   return {
     id,
+    transmitter_id: "owner",
     title: id,
     hero_image_url: null,
     transmitter_quote: null,
@@ -33,11 +34,22 @@ function makeDeps(overrides: Partial<HomeDeps> = {}): HomeDeps {
       likedIds: new Set(["rec1"]),
       savedIds: new Set<string>(),
     })),
+    resolveHeroImageUrl: vi.fn(async (url) => url),
     ...overrides,
   };
 }
 
 describe("buildHomeResponse", () => {
+  it("TOP과 추천 이미지 경로를 응답 URL로 변환한다", async () => {
+    const deps = makeDeps({
+      fetchMonthlyTop: vi.fn(async () => [{ ...row("top1", null), hero_image_url: "recipe-images/owner/top1/hero.webp" }]),
+      fetchPopular: vi.fn(async () => [{ ...row("rec1", null), hero_image_url: "recipe-images/owner/rec1/hero.webp" }]),
+      resolveHeroImageUrl: vi.fn(async (_url, _owner, id) => `https://signed.example/${id}`),
+    });
+    const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 1 });
+    expect(res.top_recipes[0].hero_image_url).toBe("https://signed.example/top1");
+    expect(res.recommended[0].hero_image_url).toBe("https://signed.example/rec1");
+  });
   it("비인증(userId=null)이면 인사말 null, 좋아요·저장 모두 false", async () => {
     const deps = makeDeps();
     const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 2 });
