@@ -79,6 +79,20 @@ describe("chatRecipe", () => {
       { recipe_id: "recipe", message: "테스트", tts: false }, s => frames.push(s));
     expect(frames.at(-1)).toContain("event: done");
   }, 500);
+  it("응답 후 분석을 등록한 작업에서 실행한다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude();
+    const analyze = vi.spyOn(ai, "analyzeJson");
+    let background: (() => Promise<void>) | undefined;
+    const frames: string[] = [];
+    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "테스트", tts: false }, s => frames.push(s), undefined,
+      task => { background = task; });
+    expect(frames.at(-1)).toContain("event: done");
+    expect(background).toBeDefined();
+    expect(analyze).not.toHaveBeenCalled();
+    await background!();
+    expect(analyze).toHaveBeenCalledOnce();
+  });
   it("사용자가 직접 확인한 답변은 background 분석 완료 후 저장된다", async () => {
     const repo = new FakeInterviewRepository(); repo.analysis = analysisFixture();
     const ai = new FakeClaude(); const a = analysisFixture(); a.questions = []; a.card.unresolved = [];
