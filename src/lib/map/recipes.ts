@@ -6,24 +6,12 @@ import { daeguRegion, mapDisplayRegions } from "./regions";
 
 export async function getMapRegions() {
   const db = createSupabaseAdminClient();
+  const { data, error } = await db.rpc("get_map_region_counts");
+  if (error) throw error;
+
   const counts = new Map<string, number>();
-  const codes = mapDisplayRegions.filter(({ sido }) => sido === "경북").map(({ region_code }) => region_code);
-  let lastId: string | undefined;
-
-  // Keep each response under the PostgREST row cap.
-  for (;;) {
-    const query = db.from("recipes").select("id,region_code")
-      .eq("status", "published").eq("visibility", "public")
-      .or(`region_code.like.27*,region_code.in.(${codes.join(",")})`).order("id").limit(250);
-    const { data, error } = await (lastId ? query.gt("id", lastId) : query);
-    if (error) throw error;
-    if (data.length === 0) break;
-
-    for (const row of data) {
-      const code = row.region_code.startsWith("27") ? daeguRegion.region_code : row.region_code;
-      counts.set(code, (counts.get(code) ?? 0) + 1);
-    }
-    lastId = data[data.length - 1].id;
+  for (const row of (data ?? []) as { region_code: string; recipe_count: number | string }[]) {
+    counts.set(row.region_code, Number(row.recipe_count));
   }
 
   return mapDisplayRegions.map((region) => ({
