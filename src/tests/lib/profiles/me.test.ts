@@ -64,3 +64,15 @@ describe("profilePatchSchema", () => {
     expect(profilePatchSchema.safeParse({ avatar_url: null }).success).toBe(true);
   });
 });
+
+describe("profile bio", () => {
+  it("공백을 제거하고 50자를 허용한다", () => {
+    const bio = "가".repeat(50);
+    expect(profilePatchSchema.parse({ bio: " " + bio + " " })).toEqual({ bio });
+  });
+
+  it("50자 초과를 거부하고 null로 지울 수 있다", () => {
+    expect(profilePatchSchema.safeParse({ bio: "가".repeat(51) }).success).toBe(false);
+    expect(profilePatchSchema.parse({ bio: null })).toEqual({ bio: null });
+  });
+});
