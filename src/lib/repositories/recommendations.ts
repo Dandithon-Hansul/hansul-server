@@ -6,6 +6,7 @@ type Database = ReturnType<typeof createSupabaseAdminClient>;
 
 export type RecommendationRow = {
   id: string;
+  transmitter_id: string;
   title: string;
   hero_image_url: string | null;
   region: string | null;
@@ -30,7 +31,7 @@ export async function getFoodPreferences(db: Database, userId: string): Promise<
 export async function getPublishedRecipes(db: Database): Promise<RecommendationRow[]> {
   const { data, error } = await db
     .from("recipes")
-    .select("id, title, hero_image_url, region, transmitter_quote, like_count, created_at")
+    .select("id, transmitter_id, title, hero_image_url, region, transmitter_quote, like_count, created_at")
     .eq("status", "published")
     .eq("visibility", "public")
     .not("title", "is", null)

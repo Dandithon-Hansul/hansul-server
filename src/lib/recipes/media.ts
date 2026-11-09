@@ -19,3 +19,13 @@ export async function recipeMediaUrl(
   if (error) throw error;
   return data.signedUrl;
 }
+
+export async function resolveRecipeHeroImages<T extends { id: string; transmitter_id: string; hero_image_url: string | null }>(
+  db: ReturnType<typeof createSupabaseAdminClient>,
+  rows: T[],
+): Promise<T[]> {
+  return Promise.all(rows.map(async (row) => ({
+    ...row,
+    hero_image_url: await recipeMediaUrl(db, row.hero_image_url, "recipe-images", `${row.transmitter_id}/${row.id}`),
+  })));
+}
