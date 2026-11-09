@@ -34,12 +34,32 @@ function makeDeps(overrides: Partial<HomeDeps> = {}): HomeDeps {
       likedIds: new Set(["rec1"]),
       savedIds: new Set<string>(),
     })),
-    resolveHeroImageUrl: vi.fn(async (url) => url),
+    resolveHeroImages: vi.fn(async (rows) => rows),
     ...overrides,
   };
 }
 
 describe("buildHomeResponse", () => {
+  it("TOP과 추천 이미지를 한 번에 해석한다", async () => {
+    const resolveHeroImages = vi.fn(async (rows: RawRecipeRow[]) => rows.map((recipe) => ({
+      ...recipe,
+      hero_image_url: `https://signed.example/${recipe.id}`,
+    })));
+    const deps = makeDeps({ resolveHeroImages });
+
+    const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 2 });
+
+    expect(resolveHeroImages).toHaveBeenCalledOnce();
+    expect(res.top_recipes.map((recipe) => recipe.hero_image_url)).toEqual([
+      "https://signed.example/top1",
+      "https://signed.example/top2",
+    ]);
+    expect(res.recommended.map((recipe) => recipe.hero_image_url)).toEqual([
+      "https://signed.example/rec1",
+      "https://signed.example/rec2",
+    ]);
+  });
+
   it("프로필·월간 TOP·추천 후보 조회를 동시에 시작한다", async () => {
     let finishMonthlyTop!: (rows: RawRecipeRow[]) => void;
     const monthlyTop = new Promise<RawRecipeRow[]>((resolve) => { finishMonthlyTop = resolve; });
@@ -64,7 +84,10 @@ describe("buildHomeResponse", () => {
     const deps = makeDeps({
       fetchMonthlyTop: vi.fn(async () => [{ ...row("top1", null), hero_image_url: "recipe-images/owner/top1/hero.webp" }]),
       fetchPopular: vi.fn(async () => [{ ...row("rec1", null), hero_image_url: "recipe-images/owner/rec1/hero.webp" }]),
-      resolveHeroImageUrl: vi.fn(async (_url, _owner, id) => `https://signed.example/${id}`),
+      resolveHeroImages: vi.fn(async (rows: RawRecipeRow[]) => rows.map((recipe) => ({
+        ...recipe,
+        hero_image_url: `https://signed.example/${recipe.id}`,
+      }))),
     });
     const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 1 });
     expect(res.top_recipes[0].hero_image_url).toBe("https://signed.example/top1");
