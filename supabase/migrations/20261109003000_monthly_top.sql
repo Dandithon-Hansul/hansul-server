@@ -36,10 +36,10 @@ AS $$
     LEFT JOIN public.profiles p ON p.id = r.transmitter_id
     LEFT JOIN public.recipe_likes rl
       ON rl.recipe_id = r.id
-      AND date_trunc('month', rl.liked_at) = date_trunc('month', now())
+      AND date_trunc('month', rl.liked_at AT TIME ZONE 'Asia/Seoul') = date_trunc('month', now() AT TIME ZONE 'Asia/Seoul')
     LEFT JOIN public.recipe_saves rs
       ON rs.recipe_id = r.id
-      AND date_trunc('month', rs.saved_at) = date_trunc('month', now())
+      AND date_trunc('month', rs.saved_at AT TIME ZONE 'Asia/Seoul') = date_trunc('month', now() AT TIME ZONE 'Asia/Seoul')
     WHERE r.status = 'published' AND r.visibility = 'public'
     GROUP BY r.id, p.display_name
   ) sub
