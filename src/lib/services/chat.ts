@@ -10,14 +10,18 @@ import { InterviewError } from "./errors";
 
 export interface ChatInput { recipe_id: string; message: string; image_path?: string; tts: boolean }
 export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts: TtsPort, embedding: EmbeddingPort, owner: string, input: ChatInput, send: (frame: string) => void, signal?: AbortSignal) {
-  const recipe = await requireRecipe(repo, owner, input.recipe_id);
-  const previous = await repo.getAnalysis(owner, input.recipe_id);
-  if (input.image_path) await repo.resolveImage(owner, input.recipe_id, input.image_path);
-  const history = await repo.listMessages(owner, input.recipe_id);
-  const last = history.at(-1);
+  const [recipe, previous, imageUrl, prevMessages] = await Promise.all([
+    requireRecipe(repo, owner, input.recipe_id),
+    repo.getAnalysis(owner, input.recipe_id),
+    input.image_path ? repo.resolveImage(owner, input.recipe_id, input.image_path) : Promise.resolve(undefined),
+    repo.listMessages(owner, input.recipe_id),
+  ]);
+  const last = prevMessages.at(-1);
   const retry = !input.image_path && last?.role === "user" && last.content === input.message && !last.image_url;
   const userMessageId = retry ? last.id : await repo.appendMessage(owner, input.recipe_id, { role: "user", content: input.message, image_url: input.image_path });
-  if (!retry) history.push({ id: userMessageId, role: "user", content: input.message, image_url: input.image_path });
+  const history = retry
+    ? prevMessages
+    : [...prevMessages, { id: userMessageId, role: "user" as const, content: input.message, image_url: imageUrl }];
   let sentence = "";
   let sequence = 0;
   let audioJobs: Promise<void> = Promise.resolve();
@@ -71,6 +75,7 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
     }
   } catch (error) {
     console.error("interview chat analysis failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
+    send(sse("error", { code: "ANALYSIS_FAILED", message: "답변은 저장됐지만 분석 갱신에 실패했습니다. 다시 분석해 주세요" }));
   }
   if (audioError) send(sse("error", { code: "TTS_FAILED", message: "텍스트 답변은 저장됐지만 음성 생성에 실패했습니다" }));
   send(sse("done", { message_id: messageId, audio_url: audioUrl }));

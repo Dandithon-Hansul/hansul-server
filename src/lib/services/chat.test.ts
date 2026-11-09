@@ -35,7 +35,65 @@ describe("chatRecipe", () => {
     await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, () => {});
     expect(synth.mock.calls.map(c => c[0])).toEqual(["소금 0.5g이에요.", "다음 문장.", "마지막 문장?", "소금 0.5g이에요. 다음 문장. 마지막 문장?"]);
   });
-  it("사용자가 직접 확인한 답변을 근거와 함께 저장한다", async () => {
+  it("이미지 소유권 확인 실패 시 메시지를 저장하지 않는다", async () => {
+    const repo = new FakeInterviewRepository(); vi.spyOn(repo, "resolveImage").mockRejectedValue(new Error("forbidden"));
+    await expect(chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "사진", image_path: "other/file.png", tts: false }, () => {})).rejects.toThrow();
+    expect(repo.messages).toEqual([]);
+  });
+  it("새 이미지 메시지는 서명된 URL로 Claude에 전달한다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude();
+    const chat = vi.spyOn(ai, "chatStream");
+    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "사진", image_path: "owner/recipe/image.png", tts: false }, () => {});
+    expect(chat.mock.calls[0][0].at(-1)).toMatchObject({ image_url: "https://example.test/image.png" });
+    expect(repo.messages[0].image_url).toBe("owner/recipe/image.png");
+  });
+  it("listMessages를 Phase 1에서 병렬로 조회한다", async () => {
+    const repo = new FakeInterviewRepository();
+    let listMessagesCalled = false;
+    vi.spyOn(repo, "listMessages").mockImplementation(async () => { listMessagesCalled = true; return []; });
+    const chatPromise = chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "테스트", tts: false }, () => {});
+    expect(listMessagesCalled).toBe(true);
+    await chatPromise;
+  });
+  it("requireRecipe와 getAnalysis를 병렬로 조회한다", async () => {
+    const repo = new FakeInterviewRepository();
+    let getAnalysisCalled = false;
+    let resolveRecipe!: () => void;
+    vi.spyOn(repo, "getRecipe").mockReturnValue(new Promise(res => { resolveRecipe = () => res(repo.recipe); }));
+    vi.spyOn(repo, "getAnalysis").mockImplementation(async () => { getAnalysisCalled = true; return null; });
+    const chatPromise = chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "테스트", tts: false }, () => {});
+    // getRecipe가 아직 pending인 상태에서 getAnalysis가 이미 호출됐어야 한다
+    expect(getAnalysisCalled).toBe(true);
+    resolveRecipe();
+    await chatPromise;
+  });
+  it("분석이 완료될 때까지 done을 보내지 않아 다음 채팅의 상태 유실을 막는다", async () => {
+    const repo = new FakeInterviewRepository();
+    const ai = new FakeClaude();
+    let finishAnalysis!: (value: ReturnType<typeof analysisFixture>) => void;
+    vi.spyOn(ai, "analyzeJson").mockReturnValue(new Promise(resolve => { finishAnalysis = resolve; }));
+    const frames: string[] = [];
+    const chat = chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "테스트", tts: false }, s => frames.push(s));
+    await vi.waitFor(() => expect(finishAnalysis).toBeTypeOf("function"));
+    expect(frames.some(frame => frame.includes("event: done"))).toBe(false);
+    finishAnalysis(analysisFixture());
+    await chat;
+    expect(frames.at(-1)).toContain("event: done");
+  });
+  it("분석 실패를 SSE에 알리고 저장된 답변의 완료 이벤트를 유지한다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude();
+    const frames: string[] = [];
+    vi.spyOn(ai, "analyzeJson").mockRejectedValue(new Error("analysis failed"));
+    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "테스트", tts: false }, s => frames.push(s));
+    expect(frames.some(frame => frame.includes('"code":"ANALYSIS_FAILED"'))).toBe(true);
+    expect(frames.at(-1)).toContain("event: done");
+  });
+  it("사용자가 직접 확인한 답변은 background 분석 완료 후 저장된다", async () => {
     const repo = new FakeInterviewRepository(); repo.analysis = analysisFixture();
     const ai = new FakeClaude(); const a = analysisFixture(); a.questions = []; a.card.unresolved = [];
     Object.assign(a.detected_sensory_terms[0], { source: "user_answer", interpreted_value: "찻숟가락 반", needs_confirmation: false });

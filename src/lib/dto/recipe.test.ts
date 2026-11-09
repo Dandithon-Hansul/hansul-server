@@ -9,6 +9,7 @@ import {
 
 const baseRow: RawRecipeRow = {
   id: "a0000001-0000-0000-0000-000000000001",
+  transmitter_id: "owner",
   title: "안동 찜닭",
   hero_image_url: "https://example.com/jjimdak.webp",
   transmitter_quote: "간장은 한 번에 붓지 말고",

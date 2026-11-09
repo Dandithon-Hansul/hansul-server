@@ -29,7 +29,7 @@ describe("recommendations repository", () => {
     await expect(getPublishedRecipes(db as never)).resolves.toEqual(recipes);
     expect(db.from).toHaveBeenCalledWith("recipes");
     expect(select).toHaveBeenCalledWith(
-      "id, title, hero_image_url, region, transmitter_quote, like_count, created_at",
+      "id, transmitter_id, title, hero_image_url, region, transmitter_quote, like_count, created_at",
     );
     expect(eq).toHaveBeenNthCalledWith(1, "status", "published");
     expect(eq).toHaveBeenNthCalledWith(2, "visibility", "public");

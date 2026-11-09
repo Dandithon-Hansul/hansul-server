@@ -5,10 +5,11 @@ import type { RawRecipeRow, InteractionSets } from "@/lib/dto/recipe";
 import type { Viewer } from "@/lib/home-response";
 
 const CARD_SELECT =
-  "id, title, hero_image_url, transmitter_quote, like_count, save_count, region, region_code, created_at, transmitter:profiles!transmitter_id(display_name)";
+  "id, transmitter_id, title, hero_image_url, transmitter_quote, like_count, save_count, region, region_code, created_at, transmitter:profiles!transmitter_id(display_name)";
 
 interface QueryRow {
   id: string;
+  transmitter_id: string;
   title: string | null;
   hero_image_url: string | null;
   transmitter_quote: string | null;
@@ -27,6 +28,7 @@ function normalizeRow(raw: QueryRow): RawRecipeRow {
   const t = Array.isArray(raw.transmitter) ? (raw.transmitter[0] ?? null) : raw.transmitter;
   return {
     id: raw.id,
+    transmitter_id: raw.transmitter_id,
     title: raw.title,
     hero_image_url: raw.hero_image_url,
     transmitter_quote: raw.transmitter_quote,
@@ -98,6 +100,7 @@ export async function searchRecipes(
 
 interface MonthlyTopRpcRow {
   id: string;
+  transmitter_id: string;
   title: string | null;
   hero_image_url: string | null;
   transmitter_quote: string | null;
@@ -112,6 +115,7 @@ interface MonthlyTopRpcRow {
 function normalizeRpcRow(raw: MonthlyTopRpcRow): RawRecipeRow {
   return {
     id: raw.id,
+    transmitter_id: raw.transmitter_id,
     title: raw.title,
     hero_image_url: raw.hero_image_url,
     transmitter_quote: raw.transmitter_quote,

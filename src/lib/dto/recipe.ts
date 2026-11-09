@@ -7,6 +7,7 @@ export interface RawTransmitter {
 
 export interface RawRecipeRow {
   id: string;
+  transmitter_id: string;
   title: string | null;
   hero_image_url: string | null;
   transmitter_quote: string | null;
