@@ -52,6 +52,13 @@ describe("signUpload grant", () => {
     expect((await signUpload(owner, { purpose: "stt_audio", content_type: "audio/webm", size_bytes: 100 }, db)).status).toBe(200);
     expect(insert.mock.calls[0][0]).toMatchObject({ purpose: "stt_audio", recipe_id: null });
   });
+  it("Safari MP4 녹음 업로드를 허용한다", async () => {
+    const { db, insert } = setup();
+    const r = await signUpload(owner, { purpose: "stt_audio", content_type: "audio/mp4", size_bytes: 100 }, db);
+    expect(r.status).toBe(200);
+    expect((await r.json()).path).toMatch(/\.mp4$/);
+    expect(insert.mock.calls[0][0].content_type).toBe("audio/mp4");
+  });
   it("stt_audio 25MB 초과는 계속 거부한다", async () => {
     const { db, createSignedUploadUrl } = setup();
     expect((await signUpload(owner, { purpose: "stt_audio", content_type: "audio/webm", size_bytes: 25 * 1024 * 1024 + 1 }, db)).status).toBe(413);

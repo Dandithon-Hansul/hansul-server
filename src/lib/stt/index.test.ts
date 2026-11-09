@@ -115,5 +115,22 @@ describe("processStt — audio_path 경로", () => {
       status: "draft",
     });
     expect(mockTranscribe).toHaveBeenCalledOnce();
+    const fileArg: File = mockTranscribe.mock.calls[0][0].file;
+    expect(fileArg.name).toBe("uuid.webm");
+    expect(fileArg.type).toBe("audio/webm");
+  });
+  it("MP4 오디오는 올바른 파일 형식으로 Whisper에 전달된다", async () => {
+    const newRecipeId = "new-recipe-uuid";
+    mockFrom.mockReturnValue({
+      insert: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: newRecipeId }, error: null }),
+        }),
+      }),
+    });
+    await processStt("user1", { audio_path: "uploads/user1/stt_audio/uuid.mp4" });
+    const fileArg: File = mockTranscribe.mock.calls[0][0].file;
+    expect(fileArg.name).toBe("uuid.mp4");
+    expect(fileArg.type).toBe("audio/mp4");
   });
 });

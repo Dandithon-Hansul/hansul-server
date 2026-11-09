@@ -1,8 +1,19 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { InterviewError } from "../services/errors";
 import { analysisSchema, type Analysis } from "./analysis";
 import type { AnalyzeInput, ChatMessage, ClaudePort } from "./claude";
 import { ANALYZE_PROMPT } from "./interview-prompt";
+
+function aiFailure(error: unknown): never {
+  if (error instanceof Anthropic.APIConnectionTimeoutError) throw new InterviewError(504, "AI_TIMEOUT", "AI 응답 시간이 초과됐습니다. 다시 시도해 주세요");
+  if (error instanceof Anthropic.APIError) {
+    if (error.status === 402) throw new InterviewError(402, "AI_QUOTA_EXCEEDED", "AI 서비스 사용 한도를 확인해 주세요");
+    if (error.status === 429) throw new InterviewError(429, "AI_RATE_LIMITED", "AI 요청이 많습니다. 잠시 후 다시 시도해 주세요");
+    throw new InterviewError(502, "AI_UPSTREAM_ERROR", "AI 서비스 연결에 실패했습니다. 잠시 후 다시 시도해 주세요");
+  }
+  throw error;
+}
 
 export class ClaudeAdapter implements ClaudePort {
   constructor(private client = new Anthropic(), private model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6") {}
@@ -15,11 +26,11 @@ export class ClaudeAdapter implements ClaudePort {
           { type: "text", text: JSON.stringify(input) + (attempt ? "\n전체 JSON 스키마와 질문 우선순위를 지켜 다시 출력하세요." : "") },
           ...input.history.filter(m => m.image_url).map(m => ({ type: "image" as const, source: { type: "url" as const, url: m.image_url! } })),
         ] }],
-      });
-      if (response.stop_reason !== "end_turn") throw new Error("AI_ANALYSIS_INCOMPLETE");
+      }).catch(aiFailure);
+      if (response.stop_reason !== "end_turn") throw new InterviewError(502, "AI_ANALYSIS_INCOMPLETE", "AI 분석이 완료되지 않았습니다. 다시 시도해 주세요");
       const text = response.content.filter(b => b.type === "text").map(b => b.text).join("");
       try { return analysisSchema.parse(JSON.parse(text)); }
-      catch (error) { if (attempt) throw error; }
+      catch { if (attempt) throw new InterviewError(502, "AI_RESPONSE_INVALID", "AI 분석 결과를 처리하지 못했습니다. 다시 시도해 주세요"); }
     }
     throw new Error("AI_ANALYSIS_INVALID");
   }
@@ -33,8 +44,8 @@ export class ClaudeAdapter implements ClaudePort {
       ] : m.content })),
     }, { signal });
     stream.on("text", onChunk);
-    const response = await stream.finalMessage();
-    if (response.stop_reason !== "end_turn") throw new Error("AI_CHAT_INCOMPLETE");
+    const response = await stream.finalMessage().catch(aiFailure);
+    if (response.stop_reason !== "end_turn") throw new InterviewError(502, "AI_CHAT_INCOMPLETE", "AI 답변이 완료되지 않았습니다. 다시 시도해 주세요");
     return response.content.filter(b => b.type === "text").map(b => b.text).join("");
   }
 }
