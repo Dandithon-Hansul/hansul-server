@@ -2,30 +2,31 @@ import "server-only";
 
 import { recipeMediaUrl } from "@/lib/recipes/media";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { mapRegions } from "./regions";
+import { daeguRegion, mapDisplayRegions } from "./regions";
 
 export async function getMapRegions() {
   const db = createSupabaseAdminClient();
   const counts = new Map<string, number>();
-  const codes = mapRegions.map(({ region_code }) => region_code);
+  const codes = mapDisplayRegions.filter(({ sido }) => sido === "경북").map(({ region_code }) => region_code);
   let lastId: string | undefined;
 
   // Keep each response under the PostgREST row cap.
   for (;;) {
     const query = db.from("recipes").select("id,region_code")
       .eq("status", "published").eq("visibility", "public")
-      .in("region_code", codes).order("id").limit(250);
+      .or(`region_code.like.27*,region_code.in.(${codes.join(",")})`).order("id").limit(250);
     const { data, error } = await (lastId ? query.gt("id", lastId) : query);
     if (error) throw error;
     if (data.length === 0) break;
 
     for (const row of data) {
-      counts.set(row.region_code, (counts.get(row.region_code) ?? 0) + 1);
+      const code = row.region_code.startsWith("27") ? daeguRegion.region_code : row.region_code;
+      counts.set(code, (counts.get(code) ?? 0) + 1);
     }
     lastId = data[data.length - 1].id;
   }
 
-  return mapRegions.map((region) => ({
+  return mapDisplayRegions.map((region) => ({
     ...region,
     recipe_count: counts.get(region.region_code) ?? 0,
   }));
@@ -33,14 +34,16 @@ export async function getMapRegions() {
 
 export async function getRegionRecipes(regionCode: string, limit: number) {
   const db = createSupabaseAdminClient();
-  const { data, error } = await db.from("recipes")
+  const query = db.from("recipes")
     .select("id,title,hero_image_url,transmitter_id,like_count,save_count,profiles!recipes_transmitter_id_fkey(display_name)")
-    .eq("region_code", regionCode)
     .eq("status", "published").eq("visibility", "public")
     .order("like_count", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id")
     .limit(limit);
+  const { data, error } = await (regionCode === daeguRegion.region_code
+    ? query.like("region_code", "27%")
+    : query.eq("region_code", regionCode));
   if (error) throw error;
 
   return Promise.all(data.map(async (recipe) => ({

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import { mapRegions } from "@/lib/map/regions";
+import { daeguRegion, mapRegions } from "@/lib/map/regions";
 import { recipeMediaUrl } from "@/lib/recipes/media";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -74,6 +74,7 @@ const fields = "id,display_name,avatar_url,region,region_code,dong";
 
 export function regionDto(code: string | null, name: string | null, dong: string | null) {
   if (!code && !name) return null;
+  if (code === daeguRegion.region_code) return { code, sido: daeguRegion.region, sigungu: null, dong };
   const known = mapRegions.find((region) => region.region_code === code);
   const sido = known?.sido === "대구" ? "대구광역시" : known?.sido === "경북" ? "경상북도" : null;
   return { code, sido, sigungu: known?.region ?? name, dong };
