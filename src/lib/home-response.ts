@@ -44,8 +44,8 @@ export async function buildHomeResponse(
     deps.fetchMonthlyTop({ limit: topLimit }),
     deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL }),
   ]);
-
   const top_recipes = topRows.map((r, i) => toTopCard(r, i + 1));
+
   const recRows = selectRecommended(pool, {
     regionCode: viewer?.region_code ?? null,
     excludeIds: new Set(topRows.map((r) => r.id)),
