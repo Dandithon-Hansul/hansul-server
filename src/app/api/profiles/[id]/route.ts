@@ -10,7 +10,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     if (isRecipeSeedMode() && !request.headers.has("authorization")) {
       if (id.data !== seedRecipe.transmitter_id) {
-        return recipeError(404, "PROFILE_NOT_FOUND", "전승자를 찾을 수 없습니다.");
+        return recipeError(404, "PROFILE_NOT_FOUND", "프로필을 찾을 수 없습니다.");
       }
 
       return recipeJson({
@@ -21,6 +21,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         bio: null,
         recipe_count: 1,
         received_like_count: seedRecipe.like_count,
+        saved_recipe_count: 0,
+        saved_recipes: [],
         recipes: [{
           recipe_id: seedRecipe.recipe_id,
           title: seedRecipe.title,
@@ -36,7 +38,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const db = createSupabaseAdminClient();
     const { data, error } = await db.rpc("get_public_transmitter", { p_profile_id: id.data });
     if (error) throw error;
-    if (!data) return recipeError(404, "PROFILE_NOT_FOUND", "전승자를 찾을 수 없습니다.");
+    if (!data) return recipeError(404, "PROFILE_NOT_FOUND", "프로필을 찾을 수 없습니다.");
     const recipes = await Promise.all(
       (data.recipes as { recipe_id: string; title: string; hero_image_url: string | null }[])
         .map(async (recipe) => ({
@@ -46,9 +48,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           ),
         })),
     );
+    const savedRecipes = await Promise.all(
+      (data.saved_recipes as {
+        recipe_id: string;
+        title: string;
+        hero_image_url: string | null;
+        transmitter_id: string;
+        transmitter_name: string | null;
+      }[]).map(async ({ transmitter_id, ...recipe }) => ({
+        ...recipe,
+        hero_image_url: await recipeMediaUrl(
+          db, recipe.hero_image_url, "recipe-images", `${transmitter_id}/${recipe.recipe_id}`,
+        ),
+      })),
+    );
     const avatarUrl = await recipeMediaUrl(db, data.avatar_url, "uploads", `${id.data}/avatar`);
-    return recipeJson({ ...data, avatar_url: avatarUrl, recipes });
+    return recipeJson({ ...data, avatar_url: avatarUrl, recipes, saved_recipes: savedRecipes });
   } catch {
-    return recipeError(500, "INTERNAL_ERROR", "전승자 정보를 불러오지 못했습니다.");
+    return recipeError(500, "INTERNAL_ERROR", "프로필 정보를 불러오지 못했습니다.");
   }
 }

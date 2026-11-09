@@ -132,7 +132,7 @@ export const openApiDocument = {
     "/api/profiles/{id}": {
       get: {
         tags: ["profiles"],
-        summary: "전승자 프로필 조회",
+        summary: "공개 프로필과 저장한 레시피 조회",
         parameters: [{ $ref: "#/components/parameters/id" }],
         responses: {
           "200": successResponse(),
