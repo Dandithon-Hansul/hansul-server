@@ -60,7 +60,11 @@ export function createInterviewHandlers(d: InterviewDependencies) {
           async start(controller) {
             const send = (frame: string) => { if (!abort.signal.aborted) controller.enqueue(encoder.encode(frame)); };
             try { await chatRecipe(d.repo, d.ai, d.tts, d.embedding, user, input, send, abort.signal); }
-            catch (error) { console.error("interview chat failed", { stage: "stream", code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" }); send(sse("error", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED", message: "답변 처리를 완료하지 못했습니다. 다시 시도해 주세요" })); }
+            catch (error) {
+              const code = error instanceof InterviewError ? error.code : error instanceof Error && error.message === "INTERVIEW_DATABASE_ERROR" ? "INTERVIEW_DATABASE_ERROR" : "INTERVIEW_FAILED";
+              console.error("interview chat failed", { stage: "stream", code });
+              send(sse("error", { code, message: "답변 처리를 완료하지 못했습니다. 다시 시도해 주세요" }));
+            }
             finally { request.signal.removeEventListener("abort", onAbort); if (!abort.signal.aborted) controller.close(); }
           },
           cancel() { abort.abort(); },

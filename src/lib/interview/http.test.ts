@@ -65,6 +65,12 @@ describe("interview HTTP", () => {
     expect(r.status).toBe(200);
     expect(await r.text()).toContain('"code":"INTERVIEW_FAILED"');
   });
+  it("채팅 메시지 DB 저장 실패를 INTERVIEW_DATABASE_ERROR로 구분한다", async () => {
+    const repo = new FakeInterviewRepository(); repo.recipe.id = id;
+    vi.spyOn(repo, "appendMessage").mockRejectedValue(new Error("INTERVIEW_DATABASE_ERROR"));
+    const r = await setup("owner", repo).chat(req({ recipe_id: id, message: "테스트" }));
+    expect(await r.text()).toContain('"code":"INTERVIEW_DATABASE_ERROR"');
+  });
   it("벡터화는 인증이 필요하며 확정 사례가 없으면 422이다", async () => {
     expect((await setup(null).vectorize(req({}))).status).toBe(401);
     const r = await setup().vectorize(req({}));
