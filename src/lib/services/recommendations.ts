@@ -44,10 +44,10 @@ export async function getRecommendedRecipes(userId: string, limit: number) {
     })
     .slice(0, limit);
   return (await resolveRecipeHeroImages(db, selected)).map((recipe) => ({
-      recipe_id: recipe.id,
-      title: recipe.title,
-      hero_image_url: recipe.hero_image_url,
-      region_tag: recipe.region ?? "",
-      transmitter_quote: recipe.transmitter_quote ?? "",
-    }));
+    recipe_id: recipe.id,
+    title: recipe.title,
+    hero_image_url: recipe.hero_image_url,
+    region_tag: recipe.region ?? "",
+    transmitter_quote: recipe.transmitter_quote ?? "",
+  }));
 }
