@@ -438,6 +438,7 @@ export const openApiDocument = {
             items: { type: "string", minLength: 1, maxLength: 50 },
             maxItems: 30,
           },
+          bio: { type: ["string", "null"], maxLength: 50 },
           avatar_url: {
             type: ["string", "null"],
             format: "uri",

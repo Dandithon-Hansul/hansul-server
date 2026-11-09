@@ -71,6 +71,7 @@ Response 200:
   {
     "id": "UUID",
     "display_name": "김한솔",
+    "bio": "가정식 레시피를 기록합니다.",
     "avatar_url": "https://...",
     "region": {"code": "47170", "sido": "경상북도", "sigungu": "안동시", "dong": "정하동"},
     "stats": {"transmitted_recipes": 2, "saved_recipes": 8, "likes_received": 34}
@@ -86,6 +87,7 @@ Body:
   {
     "display_name": "김한솔",
     "region_code": "47170",
+    "bio": null,
     "avatar_url": "https://..." | "{user_id}/avatar/{uuid}.jpg"
   }
 
@@ -99,6 +101,8 @@ Response 200:
 > 
 
 ---
+
+> 소개는 GET 응답의 bio로 반환한다. PATCH에서 앞뒤 공백을 제거한 뒤 최대 50자까지 저장하며, null을 보내면 소개를 지운다. bio를 생략하면 기존 소개를 유지한다.
 
 ## 0-1-1. 온보딩 기본 정보 저장
 
