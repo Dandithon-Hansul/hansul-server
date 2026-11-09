@@ -14,6 +14,7 @@ export interface Viewer {
 }
 
 export interface HomeDeps {
+  fetchMonthlyTop(opts: { limit: number }): Promise<RawRecipeRow[]>;
   fetchPopular(opts: { regionCode: string | null; limit: number }): Promise<RawRecipeRow[]>;
   fetchViewer(userId: string): Promise<Viewer | null>;
   fetchInteractions(userId: string, recipeIds: string[]): Promise<InteractionSets>;
@@ -40,7 +41,7 @@ export async function buildHomeResponse(
 ): Promise<HomeResponse> {
   const viewer = userId ? await deps.fetchViewer(userId) : null;
 
-  const topRows = await deps.fetchPopular({ regionCode: null, limit: topLimit });
+  const topRows = await deps.fetchMonthlyTop({ limit: topLimit });
   const top_recipes = topRows.map((r, i) => toTopCard(r, i + 1));
 
   const pool = await deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL });

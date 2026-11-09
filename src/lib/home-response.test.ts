@@ -26,6 +26,7 @@ const pool = [
 
 function makeDeps(overrides: Partial<HomeDeps> = {}): HomeDeps {
   return {
+    fetchMonthlyTop: vi.fn(async ({ limit }) => pool.slice(0, limit)),
     fetchPopular: vi.fn(async ({ limit }) => pool.slice(0, limit)),
     fetchViewer: vi.fn(async () => ({ display_name: "김한솔", region_code: "47170" })),
     fetchInteractions: vi.fn(async () => ({
@@ -59,6 +60,20 @@ describe("buildHomeResponse", () => {
     const recIds = res.recommended.map((r) => r.recipe_id);
     expect(recIds).not.toContain("top1");
     expect(recIds).not.toContain("top2");
+  });
+
+  it("fetchMonthlyTop을 top_recipes에, fetchPopular를 추천 풀에 각각 사용한다", async () => {
+    const monthlyRows = [row("m1", "27110"), row("m2", "47170")];
+    const deps = makeDeps({
+      fetchMonthlyTop: vi.fn(async () => monthlyRows),
+    });
+    const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 2 });
+
+    expect(deps.fetchMonthlyTop).toHaveBeenCalledWith({ limit: 2 });
+    expect(res.top_recipes.map((r) => r.recipe_id)).toEqual(["m1", "m2"]);
+    const recIds = res.recommended.map((r) => r.recipe_id);
+    expect(recIds).not.toContain("m1");
+    expect(recIds).not.toContain("m2");
   });
 
   it("인증 시 인사말과 좋아요 상태를 반영하고 같은 지역을 우선한다", async () => {

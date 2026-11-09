@@ -1,7 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { getRecipeViewer, recipeJson, recipeError } from "@/lib/recipes/http";
 import { buildHomeResponse } from "@/lib/home-response";
-import { fetchRecipeList, fetchViewer, fetchInteractions } from "@/lib/repositories/recipes";
+import { fetchRecipeList, fetchViewer, fetchInteractions, fetchMonthlyTop } from "@/lib/repositories/recipes";
 import { parseLimit } from "@/lib/query";
 
 const TOP_LIMIT = 6;
@@ -16,6 +16,7 @@ export async function GET(request: Request) {
 
     const response = await buildHomeResponse(
       {
+        fetchMonthlyTop: ({ limit }) => fetchMonthlyTop(client, { limit }),
         fetchPopular: ({ regionCode, limit }) =>
           fetchRecipeList(client, { regionCode, limit, sort: "popular" }),
         fetchViewer: (id) => fetchViewer(client, id),
