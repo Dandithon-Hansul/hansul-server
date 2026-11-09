@@ -21,15 +21,11 @@ describe("chatRecipe", () => {
     vi.spyOn(tts, "synthesize").mockImplementation(async () => { await gate; return Buffer.from("mp3"); });
     vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => { chunk("첫 문장. "); chunk("둘째 문장?"); release(); return "첫 문장. 둘째 문장?"; });
     const frames: string[] = [];
-    const background: (() => Promise<void>)[] = [];
-    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, s => frames.push(s), undefined, task => background.push(task));
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, s => frames.push(s));
     expect(frames.slice(0, 2).every(f => f.startsWith("event: chunk"))).toBe(true);
     expect(frames.filter(f => f.startsWith("event: audio")).map(f => JSON.parse(f.split("data: ")[1]).sequence)).toEqual([1, 2]);
-    expect(frames.at(-1)).toContain('"audio_url":null');
-    expect(repo.messages[1].audio_url).toBeNull();
-    expect(tts.synthesize).toHaveBeenCalledTimes(2);
-    expect(background).toHaveLength(1);
-    await background[0]();
+    expect(frames.at(-1)).toContain("-full.mp3");
+    expect(tts.synthesize).toHaveBeenCalledTimes(3);
     expect(repo.messages[1].audio_url).toContain("full");
   });
   it("한 청크 안의 여러 문장과 청크 사이 소수점을 구분한다", async () => {
@@ -38,11 +34,50 @@ describe("chatRecipe", () => {
     vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => {
       chunk("소금 0."); chunk("5g이에요. 다음 문장. 마지막 문장?"); return "소금 0.5g이에요. 다음 문장. 마지막 문장?";
     });
-    const background: (() => Promise<void>)[] = [];
-    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, () => {}, undefined, task => background.push(task));
-    expect(synth.mock.calls.map(c => c[0])).toEqual(["소금 0.5g이에요.", "다음 문장.", "마지막 문장?"]);
-    await background[0]();
-    expect(synth.mock.calls.at(-1)?.[0]).toBe("소금 0.5g이에요. 다음 문장. 마지막 문장?");
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, () => {});
+    expect(synth.mock.calls.map(c => c[0]).sort()).toEqual([
+      "소금 0.5g이에요.", "다음 문장.", "마지막 문장?", "소금 0.5g이에요. 다음 문장. 마지막 문장?",
+    ].sort());
+  });
+  it("전체 TTS와 분석을 병렬로 실행하고 둘 다 끝난 뒤 done에 음성 URL을 보낸다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let fullStarted = false;
+    vi.spyOn(tts, "synthesize").mockImplementation(async text => {
+      if (text === "첫 문장. 둘째 문장?") { fullStarted = true; await gate; }
+      return Buffer.from("mp3");
+    });
+    vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => {
+      chunk("첫 문장. "); chunk("둘째 문장?"); return "첫 문장. 둘째 문장?";
+    });
+    const analyze = vi.spyOn(ai, "analyzeJson");
+    const frames: string[] = [];
+    const chat = chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "설명", tts: true }, frame => frames.push(frame));
+    try {
+      await vi.waitFor(() => expect(fullStarted).toBe(true));
+      await vi.waitFor(() => expect(analyze).toHaveBeenCalled());
+      expect(frames.some(frame => frame.includes("event: done"))).toBe(false);
+    } finally { release(); }
+    await chat;
+    expect(frames.at(-1)).toContain("-full.mp3");
+  });
+  it("전체 TTS 실패 시 답변을 보존하고 음성 오류를 알린다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
+    vi.spyOn(tts, "synthesize").mockImplementation(async text => {
+      if (text === "첫 문장. 둘째 문장?") throw new Error("TTS unavailable");
+      return Buffer.from("mp3");
+    });
+    vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => {
+      chunk("첫 문장. "); chunk("둘째 문장?"); return "첫 문장. 둘째 문장?";
+    });
+    const frames: string[] = [];
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "설명", tts: true }, frame => frames.push(frame));
+    expect(repo.messages[1].audio_url).toBeNull();
+    expect(frames.some(frame => frame.includes('"code":"TTS_FAILED"'))).toBe(true);
+    expect(frames.at(-1)).toContain('"audio_url":null');
   });
   it("이미지 소유권 확인 실패 시 메시지를 저장하지 않는다", async () => {
     const repo = new FakeInterviewRepository(); vi.spyOn(repo, "resolveImage").mockRejectedValue(new Error("forbidden"));
