@@ -107,6 +107,7 @@ export async function getRecipeDetail(id: string, userId: string | null) {
       recipe_id: row.id,
       title: row.title,
       hero_image_url: heroImageUrl,
+      transmitter_id: row.transmitter_id,
       transmitter_name: profile.data!.display_name,
       transmitter_quote: row.transmitter_quote,
       context_summary: card.data?.context_summary ?? "",
