@@ -1,18 +1,8 @@
 import "server-only";
-import Anthropic, { APIError } from "@anthropic-ai/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { analysisSchema, type Analysis } from "./analysis";
 import type { AnalyzeInput, ChatMessage, ClaudePort } from "./claude";
 import { ANALYZE_PROMPT } from "./interview-prompt";
-import { InterviewError } from "../services/errors";
-
-function throwClaudeError(error: unknown): never {
-  if (error instanceof APIError) {
-    if (error.status === 402) throw new InterviewError(402, "AI_QUOTA_EXCEEDED", "AI 사용 한도를 확인해 주세요");
-    if (error.status === 429) throw new InterviewError(429, "AI_RATE_LIMITED", "잠시 후 다시 시도해 주세요");
-    if (error.status && error.status >= 500) throw new InterviewError(502, "AI_UPSTREAM_ERROR", "AI 서비스에 연결하지 못했습니다");
-  }
-  throw error;
-}
 
 export class ClaudeAdapter implements ClaudePort {
   constructor(private client = new Anthropic(), private model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6") {}
@@ -25,7 +15,7 @@ export class ClaudeAdapter implements ClaudePort {
           { type: "text", text: JSON.stringify(input) + (attempt ? "\n전체 JSON 스키마와 질문 우선순위를 지켜 다시 출력하세요." : "") },
           ...input.history.filter(m => m.image_url).map(m => ({ type: "image" as const, source: { type: "url" as const, url: m.image_url! } })),
         ] }],
-      }).catch(throwClaudeError);
+      });
       if (response.stop_reason !== "end_turn") throw new Error("AI_ANALYSIS_INCOMPLETE");
       const text = response.content.filter(b => b.type === "text").map(b => b.text).join("");
       try { return analysisSchema.parse(JSON.parse(text)); }
@@ -43,7 +33,7 @@ export class ClaudeAdapter implements ClaudePort {
       ] : m.content })),
     }, { signal });
     stream.on("text", onChunk);
-    const response = await stream.finalMessage().catch(throwClaudeError);
+    const response = await stream.finalMessage();
     if (response.stop_reason !== "end_turn") throw new Error("AI_CHAT_INCOMPLETE");
     return response.content.filter(b => b.type === "text").map(b => b.text).join("");
   }

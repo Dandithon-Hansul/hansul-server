@@ -1,10 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { APIError, RateLimitError } from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { ClaudeAdapter } from "./claude-adapter";
 import { analysisFixture } from "./__fakes__/analysis.fixture";
 const input = { transcript: "소금 쪼매", dictionary: [], history: [] };
-const fakeHeaders = { get: () => null } as unknown as Headers;
 function reply(text: string, stop_reason = "end_turn") { return { content: [{ type: "text", text }], stop_reason }; }
 function adapter(create: ReturnType<typeof vi.fn>) {
   return new ClaudeAdapter({ messages: { create } } as unknown as Anthropic, "test-model");
@@ -34,23 +32,5 @@ describe("ClaudeAdapter", () => {
   it("토큰 한도로 잘린 JSON을 사용하지 않는다", async () => {
     const create = vi.fn().mockResolvedValue(reply(JSON.stringify(analysisFixture()), "max_tokens"));
     await expect(adapter(create).analyzeJson(input)).rejects.toThrow("AI_ANALYSIS_INCOMPLETE");
-  });
-  it("Anthropic 402 오류를 AI_QUOTA_EXCEEDED InterviewError로 변환한다", async () => {
-    const create = vi.fn().mockRejectedValue(new APIError(402, {}, "payment required", fakeHeaders));
-    await expect(adapter(create).analyzeJson(input)).rejects.toMatchObject({ status: 402, code: "AI_QUOTA_EXCEEDED" });
-    expect(create).toHaveBeenCalledTimes(1);
-  });
-  it("Anthropic 429 오류를 AI_RATE_LIMITED InterviewError로 변환한다", async () => {
-    const create = vi.fn().mockRejectedValue(new RateLimitError(429, {}, "rate limited", fakeHeaders));
-    await expect(adapter(create).analyzeJson(input)).rejects.toMatchObject({ status: 429, code: "AI_RATE_LIMITED" });
-  });
-  it("Anthropic 5xx 오류를 AI_UPSTREAM_ERROR InterviewError로 변환한다", async () => {
-    const create = vi.fn().mockRejectedValue(new APIError(500, {}, "internal error", fakeHeaders));
-    await expect(adapter(create).analyzeJson(input)).rejects.toMatchObject({ status: 502, code: "AI_UPSTREAM_ERROR" });
-  });
-  it("chatStream의 Anthropic 오류를 InterviewError로 변환한다", async () => {
-    const streamObj = { on: vi.fn().mockReturnThis(), finalMessage: vi.fn().mockRejectedValue(new APIError(500, {}, "stream error", fakeHeaders)) };
-    const a = new ClaudeAdapter({ messages: { stream: vi.fn().mockReturnValue(streamObj) } } as unknown as Anthropic, "test-model");
-    await expect(a.chatStream([], "prompt", () => {})).rejects.toMatchObject({ status: 502, code: "AI_UPSTREAM_ERROR" });
   });
 });
