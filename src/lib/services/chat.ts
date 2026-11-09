@@ -55,15 +55,19 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
     catch (error) { audioError = error; }
   }
   const messageId = await repo.appendMessage(owner, input.recipe_id, { role: "assistant", content: response, audio_url: audioUrl });
-  await analyzeRecipe(repo, ai, embedding, owner, input.recipe_id);
-  const analysis = await repo.getAnalysis(owner, input.recipe_id);
-  if (analysis) {
-    const dictionary = await repo.listDictionary(owner);
-    for (const term of confirmedAnswers(analysis, previous ?? undefined, input.message)) {
-      const repeats = dictionary.filter(e => e.expression === term.expression && e.dimension === term.dimension && e.context === term.context && e.food_name === analysis.recipe.food_name && e.resolved_value === term.interpreted_value).reduce((sum, e) => sum + e.confirmations, 0);
-      await repo.addCase(owner, { recipe_id: input.recipe_id, message_id: userMessageId, expression: term.expression, dimension: term.dimension, context: term.context, food_name: analysis.recipe.food_name, resolved_value: term.interpreted_value!, evidence: input.message, embedding: await embedding.embed(`${term.dimension}: ${term.expression}`), confidence: repeats ? 0.9 : 0.6 });
-    }
-  }
   if (audioError) send(sse("error", { code: "TTS_FAILED", message: "텍스트 답변은 저장됐지만 음성 생성에 실패했습니다" }));
   send(sse("done", { message_id: messageId, audio_url: audioUrl }));
+  // done 전송 후 분석·사전 갱신은 background에서 실행 (응답 지연 없음)
+  ;(async () => {
+    try {
+      await analyzeRecipe(repo, ai, embedding, owner, input.recipe_id);
+      const analysis = await repo.getAnalysis(owner, input.recipe_id);
+      if (!analysis) return;
+      const dictionary = await repo.listDictionary(owner);
+      for (const term of confirmedAnswers(analysis, previous ?? undefined, input.message)) {
+        const repeats = dictionary.filter(e => e.expression === term.expression && e.dimension === term.dimension && e.context === term.context && e.food_name === analysis.recipe.food_name && e.resolved_value === term.interpreted_value).reduce((sum, e) => sum + e.confirmations, 0);
+        await repo.addCase(owner, { recipe_id: input.recipe_id, message_id: userMessageId, expression: term.expression, dimension: term.dimension, context: term.context, food_name: analysis.recipe.food_name, resolved_value: term.interpreted_value!, evidence: input.message, embedding: await embedding.embed(`${term.dimension}: ${term.expression}`), confidence: repeats ? 0.9 : 0.6 });
+      }
+    } catch { /* background 실패는 조용히 무시 */ }
+  })();
 }
