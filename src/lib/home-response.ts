@@ -39,12 +39,13 @@ export async function buildHomeResponse(
   deps: HomeDeps,
   { userId, limit, topLimit }: { userId: string | null; limit: number; topLimit: number },
 ): Promise<HomeResponse> {
-  const viewer = userId ? await deps.fetchViewer(userId) : null;
-
-  const topRows = await deps.fetchMonthlyTop({ limit: topLimit });
+  const [viewer, topRows, pool] = await Promise.all([
+    userId ? deps.fetchViewer(userId) : Promise.resolve(null),
+    deps.fetchMonthlyTop({ limit: topLimit }),
+    deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL }),
+  ]);
   const top_recipes = topRows.map((r, i) => toTopCard(r, i + 1));
 
-  const pool = await deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL });
   const recRows = selectRecommended(pool, {
     regionCode: viewer?.region_code ?? null,
     excludeIds: new Set(topRows.map((r) => r.id)),
