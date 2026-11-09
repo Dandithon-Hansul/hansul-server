@@ -76,12 +76,17 @@ export async function searchRecipes(
 
   let query = client
     .from("recipes")
-    .select(CARD_SELECT)
+    .select(term ? `${CARD_SELECT},transmitter_match:profiles!transmitter_id()` : CARD_SELECT)
     .eq("status", "published")
     .eq("visibility", "public");
 
   if (regionCode) query = query.eq("region_code", regionCode);
-  if (term) query = query.or(`title.ilike.%${term}%,region.ilike.%${term}%`);
+  if (term) {
+    // Filter through a separate embed so title and region matches still return the transmitter.
+    query = query
+      .ilike("transmitter_match.display_name", `%${term}%`)
+      .or(`title.ilike.%${term}%,region.ilike.%${term}%,transmitter_match.not.is.null`);
+  }
 
   const { data, error } = await query
     .order("like_count", { ascending: false })
