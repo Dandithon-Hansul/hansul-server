@@ -1,6 +1,6 @@
 import "server-only";
 
-import { recipeMediaUrl } from "@/lib/recipes/media";
+import { batchRecipeMediaUrls, type MediaItemToResolve } from "@/lib/recipes/media";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { daeguRegion, mapDisplayRegions } from "./regions";
 
@@ -46,14 +46,20 @@ export async function getRegionRecipes(regionCode: string, limit: number) {
     : query.eq("region_code", regionCode));
   if (error) throw error;
 
-  return Promise.all(data.map(async (recipe) => ({
+  const items: MediaItemToResolve[] = data.map((recipe) => ({
+    key: recipe.id,
+    value: recipe.hero_image_url,
+    bucket: "recipe-images",
+    ownerPath: `${recipe.transmitter_id}/${recipe.id}`,
+  }));
+  const urlMap = await batchRecipeMediaUrls(db, items);
+
+  return data.map((recipe) => ({
     recipe_id: recipe.id,
     title: recipe.title,
-    hero_image_url: await recipeMediaUrl(
-      db, recipe.hero_image_url, "recipe-images", recipe.transmitter_id + "/" + recipe.id,
-    ),
+    hero_image_url: urlMap.get(recipe.id) ?? null,
     transmitter_name: (recipe.profiles as unknown as { display_name: string }).display_name,
     like_count: recipe.like_count,
     save_count: recipe.save_count,
-  })));
+  }));
 }
