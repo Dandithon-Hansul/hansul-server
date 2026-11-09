@@ -9,13 +9,14 @@ import { confirmedAnswers } from "./sensory";
 
 export interface ChatInput { recipe_id: string; message: string; image_path?: string; tts: boolean }
 export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts: TtsPort, embedding: EmbeddingPort, owner: string, input: ChatInput, send: (frame: string) => void, signal?: AbortSignal) {
-  const [recipe, previous] = await Promise.all([
+  const [recipe, previous, , prevMessages] = await Promise.all([
     requireRecipe(repo, owner, input.recipe_id),
     repo.getAnalysis(owner, input.recipe_id),
     input.image_path ? repo.resolveImage(owner, input.recipe_id, input.image_path) : Promise.resolve(),
+    repo.listMessages(owner, input.recipe_id),
   ]);
   const userMessageId = await repo.appendMessage(owner, input.recipe_id, { role: "user", content: input.message, image_url: input.image_path });
-  const history = await repo.listMessages(owner, input.recipe_id);
+  const history = [...prevMessages, { role: "user" as const, content: input.message, image_url: input.image_path }];
   let sentence = "";
   let sequence = 0;
   let audioJobs: Promise<void> = Promise.resolve();

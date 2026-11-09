@@ -3,7 +3,7 @@ import type { InterviewRepository } from "../db/interview";
 import type { ClaudePort } from "../ai/claude";
 import type { EmbeddingPort } from "../ai/embedding";
 import type { TtsPort } from "../ai/tts";
-import { analyzeRecipe, requireRecipe } from "../services/analyze";
+import { analyzeRecipe } from "../services/analyze";
 import { chatRecipe } from "../services/chat";
 import { publishRecipe } from "../services/publish";
 import { vectorizeProfile } from "../services/vectorize";
@@ -46,8 +46,6 @@ export function createInterviewHandlers(d: InterviewDependencies) {
     async chat(request: Request) {
       try {
         const user = owner(); const input = await body(request, chatInput);
-        await requireRecipe(d.repo, user, input.recipe_id);
-        if (input.image_path) await d.repo.resolveImage(user, input.recipe_id, input.image_path);
         const abort = new AbortController();
         const onAbort = () => abort.abort();
         request.signal.addEventListener("abort", onAbort, { once: true });

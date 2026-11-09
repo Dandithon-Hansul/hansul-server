@@ -40,6 +40,15 @@ describe("chatRecipe", () => {
     await expect(chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "사진", image_path: "other/file.png", tts: false }, () => {})).rejects.toThrow();
     expect(repo.messages).toEqual([]);
   });
+  it("listMessages를 Phase 1에서 병렬로 조회한다", async () => {
+    const repo = new FakeInterviewRepository();
+    let listMessagesCalled = false;
+    vi.spyOn(repo, "listMessages").mockImplementation(async () => { listMessagesCalled = true; return []; });
+    const chatPromise = chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "테스트", tts: false }, () => {});
+    expect(listMessagesCalled).toBe(true);
+    await chatPromise;
+  });
   it("requireRecipe와 getAnalysis를 병렬로 조회한다", async () => {
     const repo = new FakeInterviewRepository();
     let getAnalysisCalled = false;
