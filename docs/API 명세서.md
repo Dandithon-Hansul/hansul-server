@@ -407,6 +407,7 @@ Response 200:
     recipe_id:         UUID,
     title:             string,
     hero_image_url:    string | null,
+    transmitter_id:    UUID,
     transmitter_name:  string,
     transmitter_quote: string | null,
     context_summary:   string,
