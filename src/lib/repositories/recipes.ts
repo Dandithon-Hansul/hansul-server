@@ -91,6 +91,45 @@ export async function searchRecipes(
   return (data as unknown as QueryRow[]).map(normalizeRow);
 }
 
+interface MonthlyTopRpcRow {
+  id: string;
+  title: string | null;
+  hero_image_url: string | null;
+  transmitter_quote: string | null;
+  like_count: number;
+  save_count: number;
+  region: string | null;
+  region_code: string | null;
+  created_at: string;
+  transmitter_display_name: string | null;
+}
+
+function normalizeRpcRow(raw: MonthlyTopRpcRow): RawRecipeRow {
+  return {
+    id: raw.id,
+    title: raw.title,
+    hero_image_url: raw.hero_image_url,
+    transmitter_quote: raw.transmitter_quote,
+    like_count: raw.like_count,
+    save_count: raw.save_count,
+    region: raw.region,
+    region_code: raw.region_code,
+    created_at: raw.created_at,
+    transmitter: raw.transmitter_display_name
+      ? { display_name: raw.transmitter_display_name }
+      : null,
+  };
+}
+
+export async function fetchMonthlyTop(
+  client: SupabaseClient,
+  { limit }: { limit: number },
+): Promise<RawRecipeRow[]> {
+  const { data, error } = await client.rpc("get_monthly_top_recipes", { p_limit: limit });
+  if (error) throw error;
+  return (data as MonthlyTopRpcRow[]).map(normalizeRpcRow);
+}
+
 export async function fetchViewer(
   client: SupabaseClient,
   userId: string,
