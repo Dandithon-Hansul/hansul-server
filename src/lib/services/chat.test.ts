@@ -40,6 +40,19 @@ describe("chatRecipe", () => {
     await expect(chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "사진", image_path: "other/file.png", tts: false }, () => {})).rejects.toThrow();
     expect(repo.messages).toEqual([]);
   });
+  it("requireRecipe와 getAnalysis를 병렬로 조회한다", async () => {
+    const repo = new FakeInterviewRepository();
+    let getAnalysisCalled = false;
+    let resolveRecipe!: () => void;
+    vi.spyOn(repo, "getRecipe").mockReturnValue(new Promise(res => { resolveRecipe = () => res(repo.recipe); }));
+    vi.spyOn(repo, "getAnalysis").mockImplementation(async () => { getAnalysisCalled = true; return null; });
+    const chatPromise = chatRecipe(repo, new FakeClaude(), new FakeTts(), new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "테스트", tts: false }, () => {});
+    // getRecipe가 아직 pending인 상태에서 getAnalysis가 이미 호출됐어야 한다
+    expect(getAnalysisCalled).toBe(true);
+    resolveRecipe();
+    await chatPromise;
+  });
   it("분석이 완료되기 전에 done을 보낸다", async () => {
     const repo = new FakeInterviewRepository();
     const ai = new FakeClaude();
