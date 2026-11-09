@@ -28,7 +28,9 @@ async function transcribeAudio(userId: string, audioPath: string): Promise<strin
   if (error || !data) throw new Error("STORAGE_DOWNLOAD_FAILED");
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const file = new File([data], "audio.webm", { type: "audio/webm" });
+  const contentType = filename.toLowerCase().endsWith(".mp4") ? "audio/mp4"
+    : filename.toLowerCase().endsWith(".wav") ? "audio/wav" : "audio/webm";
+  const file = new File([data], filename, { type: contentType });
   const result = await openai.audio.transcriptions.create({
     file,
     model: process.env.STT_MODEL ?? "whisper-1",
