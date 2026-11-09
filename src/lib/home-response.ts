@@ -18,7 +18,7 @@ export interface HomeDeps {
   fetchPopular(opts: { regionCode: string | null; limit: number }): Promise<RawRecipeRow[]>;
   fetchViewer(userId: string): Promise<Viewer | null>;
   fetchInteractions(userId: string, recipeIds: string[]): Promise<InteractionSets>;
-  resolveHeroImageUrl(url: string | null, transmitterId: string, recipeId: string): Promise<string | null>;
+  resolveHeroImages(rows: RawRecipeRow[]): Promise<RawRecipeRow[]>;
 }
 
 export interface HomeResponse {
@@ -51,23 +51,15 @@ export async function buildHomeResponse(
     limit,
   });
 
-  const [top_recipes, interactions, recommendedUrls] = await Promise.all([
-    Promise.all(topRows.map(async (r, i) => ({
-      ...toTopCard(r, i + 1),
-      hero_image_url: await deps.resolveHeroImageUrl(r.hero_image_url, r.transmitter_id, r.id),
-    }))),
+  const [resolvedRows, interactions] = await Promise.all([
+    deps.resolveHeroImages([...topRows, ...recRows]),
     userId && recRows.length > 0
       ? deps.fetchInteractions(userId, recRows.map((r) => r.id))
       : Promise.resolve(EMPTY_INTERACTIONS),
-    Promise.all(recRows.map((r) =>
-      deps.resolveHeroImageUrl(r.hero_image_url, r.transmitter_id, r.id),
-    )),
   ]);
 
-  const recommended = recRows.map((r, i) => ({
-    ...toRecommendedCard(r, interactions),
-    hero_image_url: recommendedUrls[i],
-  }));
+  const top_recipes = resolvedRows.slice(0, topRows.length).map((r, i) => toTopCard(r, i + 1));
+  const recommended = resolvedRows.slice(topRows.length).map((r) => toRecommendedCard(r, interactions));
 
   return {
     greeting_name: viewer?.display_name ?? null,
