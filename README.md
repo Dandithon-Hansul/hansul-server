@@ -33,8 +33,10 @@
 - [서비스 개요](#-서비스-개요)
 - [기술 스택](#️-기술-스택)
 - [로컬 실행](#-로컬-실행)
+- [Docker](#-docker)
 - [환경변수](#️-환경변수)
 - [프로젝트 구조](#-프로젝트-구조)
+- [문서](#-문서)
 
 ---
 
@@ -123,12 +125,39 @@ npm run dev
 | `http://localhost:3000/api/health` | 서버 상태 확인 |
 | `http://localhost:3000/api-docs` | Swagger UI |
 
+### 테스트
+
+```bash
+npm test               # 단일 실행
+npm run test:watch     # watch 모드
+```
+
 ### 정적 검사 / 빌드
 
 ```bash
 npm run lint
 npm run typecheck
 npm run build
+```
+
+---
+
+## 🐳 Docker
+
+`NEXT_PUBLIC_*` 변수는 빌드 타임에 번들링되므로 `--build-arg`로 주입합니다.
+
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_SUPABASE_URL=<값> \
+  --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<값> \
+  --build-arg NEXT_PUBLIC_KAKAO_MAP_APP_KEY=<값> \
+  -t hansul-server .
+
+docker run -p 3000:3000 \
+  -e SUPABASE_SERVICE_ROLE_KEY=<값> \
+  -e ANTHROPIC_API_KEY=<값> \
+  -e OPENAI_API_KEY=<값> \
+  hansul-server
 ```
 
 ---
@@ -177,3 +206,14 @@ hansul-server/
     ├── 시스템 아키텍처.md
     └── decisions/        # ADR (Architecture Decision Records)
 ```
+
+---
+
+## 📚 문서
+
+| 문서 | 내용 |
+|------|------|
+| [시스템 아키텍처](docs/시스템%20아키텍처.md) | 컴포넌트 구성과 데이터 흐름 |
+| [ERD](docs/ERD.md) | 데이터베이스 스키마 |
+| [API 명세서](docs/API%20명세서.md) | REST API 상세 명세 |
+| [ADR](docs/decisions/) | 주요 아키텍처 결정 기록 |
