@@ -33,3 +33,17 @@ describe("sensory dictionary", () => {
     expect(confirmedAnswers(a, analysisFixture(), "찻숟가락 반 넣어요")).toHaveLength(1);
   });
 });
+
+it("즉시 질문 없이 자발적으로 답한 감각 값도 답변 원문에 있으면 확정한다", () => {
+  const analysis = analysisFixture();
+  const previous = analysisFixture();
+  previous.questions = [];
+  Object.assign(analysis.detected_sensory_terms[0], {
+    needs_confirmation: false,
+    source: "user_answer",
+    interpreted_value: "찻숟가락 반",
+  });
+
+  expect(confirmedAnswers(analysis, previous, "찻숟가락 반 넣어요")).toHaveLength(1);
+  expect(confirmedAnswers(analysis, previous, "조금 넣어요")).toEqual([]);
+});
