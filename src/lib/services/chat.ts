@@ -61,7 +61,8 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
   const finalSegmentCount = segmentCount;
   const finalAudioError = audioError;
   scheduleBackground(async () => {
-    if (input.tts && response.trim() && finalSegmentCount && !finalAudioError) {
+    const fullAudio = (async () => {
+      if (!input.tts || !response.trim() || !finalSegmentCount || finalAudioError) return;
       try {
         const audio = await tts.synthesize(response);
         const url = await repo.storeAudio(owner, input.recipe_id, `${audioId}-full`, audio);
@@ -69,11 +70,10 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
       } catch (error) {
         console.error("interview chat full audio failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
       }
-    }
-    try {
-      await analyzeRecipe(repo, ai, embedding, owner, input.recipe_id);
-    } catch (error) {
+    })();
+    const analysis = analyzeRecipe(repo, ai, embedding, owner, input.recipe_id).catch(error => {
       console.error("interview chat analysis failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
-    }
+    });
+    await Promise.all([fullAudio, analysis]);
   });
 }
