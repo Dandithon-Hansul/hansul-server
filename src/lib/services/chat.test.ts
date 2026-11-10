@@ -218,7 +218,7 @@ it("전체 분석 전에 선택지를 보내고 다음 답변과 함께 분석�
   const full = vi.spyOn(ai, "analyzeJson").mockResolvedValueOnce(analysisFixture()).mockResolvedValueOnce(current);
   const stream = vi.spyOn(ai, "chatStream");
   stream.mockResolvedValueOnce("이야기를 잘 들었어요.");
-  stream.mockResolvedValueOnce('{"question":"농도는 어느 정도인가요?","options":["묽게","되직하게"]}');
+  stream.mockResolvedValueOnce("\x60\x60\x60json\n{\"question\":\"농도는 어느 정도인가요?\",\"options\":[\"묽게\",\"되직하게\"]}\n\x60\x60\x60");
   stream.mockResolvedValueOnce("확인했어요.");
   stream.mockResolvedValueOnce("null");
   const frames: string[] = [];
@@ -229,6 +229,7 @@ it("전체 분석 전에 선택지를 보내고 다음 답변과 함께 분석�
   await send("국물을 졸여요.");
   expect(frames.find(frame => frame.startsWith("event: choices"))).toContain("되직하게");
   expect(full).not.toHaveBeenCalled();
+  expect(stream.mock.calls[1][0].at(-1)?.role).toBe("user");
   expect(jobs).toHaveLength(1);
   await jobs.shift()!();
   expect(full).toHaveBeenCalledTimes(1);
