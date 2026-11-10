@@ -8,6 +8,7 @@ import { ANALYZE_PROMPT } from "./interview-prompt";
 function aiFailure(error: unknown): never {
   if (error instanceof Anthropic.APIConnectionTimeoutError) throw new InterviewError(504, "AI_TIMEOUT", "AI 응답 시간이 초과됐습니다. 다시 시도해 주세요");
   if (error instanceof Anthropic.APIError) {
+    console.error("Anthropic API error", { status: error.status, message: error.message });
     if (error.status === 402) throw new InterviewError(402, "AI_QUOTA_EXCEEDED", "AI 서비스 사용 한도를 확인해 주세요");
     if (error.status === 429) throw new InterviewError(429, "AI_RATE_LIMITED", "AI 요청이 많습니다. 잠시 후 다시 시도해 주세요");
     throw new InterviewError(502, "AI_UPSTREAM_ERROR", "AI 서비스 연결에 실패했습니다. 잠시 후 다시 시도해 주세요");
