@@ -30,7 +30,14 @@ export async function generateStepImages(d: StepImageDependencies, owner: string
       try {
         const path = step.image_url || await d.save(owner, id, step.order, await d.generate(prompt));
         generated.push({ order: step.order, image_url: await d.url(owner, id, path), prompt_used: step.image_url ? "" : prompt });
-      } catch {
+      } catch (error) {
+        const detail = error && typeof error === "object" ? error as { status?: number; code?: string } : {};
+        console.error("Step image generation failed", {
+          order: step.order,
+          name: error instanceof Error ? error.name : "UnknownError",
+          status: detail.status,
+          code: detail.code,
+        });
         failed_orders.push(step.order);
       }
     }));
