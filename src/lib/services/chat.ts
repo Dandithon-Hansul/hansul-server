@@ -19,9 +19,15 @@ async function nextChoices(ai: ClaudePort, messages: Parameters<ClaudePort["chat
     const raw = await ai.chatStream(messages,
       "레시피 대화에서 아직 답하지 않은 다음 감각 질문 하나와 서로 다른 선택지 2~4개를 만든다. 마지막 사용자 답을 반복해서 묻지 않는다. 질문이 없으면 null. JSON만 출력한다: {\"question\":\"…\",\"options\":[\"…\",\"…\"]}",
       () => {}, signal ? AbortSignal.any([signal, timeout]) : timeout);
-    const result = choicesSchema.parse(JSON.parse(raw));
+    const fenced = raw.trim().match(/^\x60{3}(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n\x60{3}$/i);
+    const result = choicesSchema.parse(JSON.parse(fenced ? fenced[1] : raw));
     return result && new Set(result.options).size === result.options.length ? result : null;
-  } catch {
+  } catch (error) {
+    const code = error instanceof InterviewError ? error.code
+      : error instanceof SyntaxError ? "INVALID_JSON"
+      : error instanceof z.ZodError ? "INVALID_CHOICES"
+      : timeout.aborted ? "CHOICES_TIMEOUT" : "CHOICES_FAILED";
+    if (!signal?.aborted) console.warn("chat choices failed", { code });
     return null;
   }
 }
@@ -77,7 +83,7 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
     nextChoices(ai, [
       { role: "user", content: JSON.stringify({ transcript: recipe.transcript }) },
       ...history.slice(-8).map(({ role, content }) => ({ role, content })),
-      { role: "assistant", content: response },
+      { role: "user", content: JSON.stringify({ last_assistant_reply: response, task: "다음 선택지를 JSON으로 출력해 주세요." }) },
     ], signal),
     audioJobs,
   ]);
