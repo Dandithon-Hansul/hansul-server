@@ -16,10 +16,9 @@ export function matchDictionary(term: Term, food: string, embedding: number[] | 
   return candidates[0];
 }
 export function confirmedAnswers(a: Analysis, previous: Analysis | undefined, message: string) {
-  if (!previous) return [];
-  const asked = previous.questions.filter(q => q.ask_now).map(q => q.expression);
+  const asked = previous?.questions.filter(q => q.ask_now).map(q => q.expression) ?? [];
   return a.detected_sensory_terms.filter(t =>
-    asked.includes(t.expression) && t.source === "user_answer" && !t.needs_confirmation &&
+    (asked.length === 0 || asked.includes(t.expression)) && t.source === "user_answer" && !t.needs_confirmation &&
     t.interpreted_value?.trim() && message.includes(t.interpreted_value),
   );
 }
