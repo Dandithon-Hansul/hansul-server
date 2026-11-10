@@ -13,6 +13,25 @@ describe("analyzeRecipe", () => {
     expect(JSON.stringify(result)).not.toContain("normalized_transcript");
     expect(repo.analysis?.card.unresolved).toEqual(["소금 양"]);
   });
+  it("P0 질문 없이 채팅에서 확정한 값은 분석 응답 전에 저장한다", async () => {
+    const repo = new FakeInterviewRepository();
+    const ai = new FakeClaude();
+    repo.analysis = analysisFixture();
+    repo.analysis.questions = [];
+    await repo.appendMessage("owner", "recipe", { role: "user", content: "찻숟가락 반 넣어요" });
+    await repo.appendMessage("owner", "recipe", { role: "assistant", content: "확인했어요" });
+    const analysis = analysisFixture();
+    analysis.questions = [];
+    Object.assign(analysis.detected_sensory_terms[0], {
+      source: "user_answer", needs_confirmation: false, interpreted_value: "찻숟가락 반",
+    });
+    vi.spyOn(ai, "analyzeJson").mockResolvedValue(analysis);
+
+    await analyzeRecipe(repo, ai, new FakeEmbedding(), "owner", "recipe");
+
+    expect(repo.cases).toHaveLength(1);
+    expect(repo.cases[0]).toMatchObject({ message_id: "message-1", resolved_value: "찻숟가락 반" });
+  });
   it("타인 초안이나 발행된 레시피는 분석하지 않는다", async () => {
     const repo = new FakeInterviewRepository(); const ai = new FakeClaude();
     const spy = vi.spyOn(ai, "analyzeJson");
