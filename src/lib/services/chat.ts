@@ -1,11 +1,30 @@
+import { z } from "zod";
 import type { ClaudePort } from "../ai/claude";
 import type { TtsPort } from "../ai/tts";
 import type { EmbeddingPort } from "../ai/embedding";
 import { CHAT_PROMPT } from "../ai/interview-prompt";
 import type { InterviewRepository } from "../db/interview";
 import { sse } from "../sse";
-import { analyzeRecipe, requireRecipe } from "./analyze";
+import { analyzeRecipe, CHAT_CHOICE_PREFIX, requireRecipe } from "./analyze";
 import { InterviewError } from "./errors";
+
+const choicesSchema = z.object({
+  question: z.string().trim().min(1).max(200),
+  options: z.array(z.string().trim().min(1).max(100)).min(2).max(4),
+}).nullable();
+
+async function nextChoices(ai: ClaudePort, messages: Parameters<ClaudePort["chatStream"]>[0], signal?: AbortSignal) {
+  const timeout = AbortSignal.timeout(8_000);
+  try {
+    const raw = await ai.chatStream(messages,
+      "레시피 대화에서 아직 답하지 않은 다음 감각 질문 하나와 서로 다른 선택지 2~4개를 만든다. 마지막 사용자 답을 반복해서 묻지 않는다. 질문이 없으면 null. JSON만 출력한다: {\"question\":\"…\",\"options\":[\"…\",\"…\"]}",
+      () => {}, signal ? AbortSignal.any([signal, timeout]) : timeout);
+    const result = choicesSchema.parse(JSON.parse(raw));
+    return result && new Set(result.options).size === result.options.length ? result : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface ChatInput { recipe_id: string; message: string; image_path?: string; tts: boolean }
 export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts: TtsPort, embedding: EmbeddingPort, owner: string, input: ChatInput, send: (frame: string) => void, signal?: AbortSignal, scheduleBackground: (job: () => Promise<void>) => void = () => {}) {
@@ -54,9 +73,18 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
     }, signal);
   } catch (error) { await audioJobs; throw error; }
   queueAudio(sentence);
-  await audioJobs;
+  const [choices] = await Promise.all([
+    nextChoices(ai, [
+      { role: "user", content: JSON.stringify({ transcript: recipe.transcript }) },
+      ...history.slice(-8).map(({ role, content }) => ({ role, content })),
+      { role: "assistant", content: response },
+    ], signal),
+    audioJobs,
+  ]);
   signal?.throwIfAborted();
-  const messageId = await repo.appendMessage(owner, input.recipe_id, { role: "assistant", content: response, audio_url: null });
+  const content = choices ? `${response}${CHAT_CHOICE_PREFIX}${choices.question}\n${choices.options.join(" / ")}` : response;
+  const messageId = await repo.appendMessage(owner, input.recipe_id, { role: "assistant", content, audio_url: null });
+  send(sse("choices", choices ?? { question: null, options: [] }));
   send(sse("done", { message_id: messageId, audio_url: null }));
   const finalSegmentCount = segmentCount;
   const finalAudioError = audioError;
@@ -71,7 +99,8 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
         console.error("interview chat full audio failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
       }
     })();
-    const analysis = analyzeRecipe(repo, ai, embedding, owner, input.recipe_id).catch(error => {
+    const analysis = analyzeRecipe(repo, ai, embedding, owner, input.recipe_id, messageId).catch(error => {
+      if (error instanceof InterviewError && error.code === "STALE_ANALYSIS") return;
       console.error("interview chat analysis failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
     });
     await Promise.all([fullAudio, analysis]);

@@ -92,3 +92,15 @@ describe("analyzeRecipe", () => {
   });
 
 });
+
+it("이미 다음 채팅이 시작된 백그라운드 분석은 모델을 호출하지 않는다", async () => {
+  const repo = new FakeInterviewRepository();
+  const ai = new FakeClaude();
+  const model = vi.spyOn(ai, "analyzeJson");
+  await repo.appendMessage("owner", "recipe", { role: "assistant", content: "이전 질문" });
+  await repo.appendMessage("owner", "recipe", { role: "user", content: "새 답변" });
+
+  await expect(analyzeRecipe(repo, ai, new FakeEmbedding(), "owner", "recipe", "message-1"))
+    .rejects.toMatchObject({ code: "STALE_ANALYSIS" });
+  expect(model).not.toHaveBeenCalled();
+});
