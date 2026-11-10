@@ -35,6 +35,29 @@ describe("ClaudeAdapter", () => {
     await expect(adapter(create).analyzeJson(input)).resolves.toMatchObject({ recipe: { food_name: "나물무침" } });
     expect(create).toHaveBeenCalledTimes(2);
   });
+  it("두 번째 응답에도 필수 필드가 빠지면 오류 경로를 갱신해 한 번 더 재시도한다", async () => {
+    const first = JSON.parse(JSON.stringify(analysisFixture()));
+    delete first.recipe.ingredients[0].original_expression;
+    const second = JSON.parse(JSON.stringify(analysisFixture()));
+    delete second.questions[0].question;
+    const create = vi.fn()
+      .mockResolvedValueOnce(reply(JSON.stringify(first)))
+      .mockResolvedValueOnce(reply(JSON.stringify(second)))
+      .mockResolvedValueOnce(reply(JSON.stringify(analysisFixture())));
+    await expect(adapter(create).analyzeJson(input)).resolves.toMatchObject({ recipe: { food_name: "나물무침" } });
+    expect(create).toHaveBeenCalledTimes(3);
+    expect(create.mock.calls[2][0].messages[0].content[0].text).toContain("questions[].question");
+  });
+  it("즉시 질문이 여러 개면 첫 P0 하나만 남기고 검증한다", async () => {
+    const output = analysisFixture();
+    output.questions.push({ ...output.questions[0], id: "q2", ask_now: true });
+    output.pending_questions.push({ ...output.questions[0], id: "q3", priority: "P1", ask_now: true });
+    const create = vi.fn().mockResolvedValue(reply(JSON.stringify(output)));
+    const result = await adapter(create).analyzeJson(input);
+    expect(result.questions.map(q => q.ask_now)).toEqual([true, false]);
+    expect(result.pending_questions.map(q => q.ask_now)).toEqual([false]);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
   it("형식 오류만 한 번 재시도한다", async () => {
     const create = vi.fn().mockResolvedValueOnce(reply("설명문")).mockResolvedValueOnce(reply(JSON.stringify(analysisFixture())));
     await adapter(create).analyzeJson(input);
@@ -43,7 +66,7 @@ describe("ClaudeAdapter", () => {
   it("계속 잘못된 JSON이면 저장 가능한 결과를 반환하지 않는다", async () => {
     const create = vi.fn().mockResolvedValue(reply("{}"));
     await expect(adapter(create).analyzeJson(input)).rejects.toThrow();
-    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledTimes(3);
   });
   it("네트워크 오류는 형식 재시도로 중복 호출하지 않는다", async () => {
     const create = vi.fn().mockRejectedValue(new Error("network"));
