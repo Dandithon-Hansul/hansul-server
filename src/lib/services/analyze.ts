@@ -3,7 +3,7 @@ import type { ClaudePort } from "../ai/claude";
 import type { EmbeddingPort } from "../ai/embedding";
 import type { InterviewRepository } from "../db/interview";
 import { InterviewError } from "./errors";
-import { matchDictionary } from "./sensory";
+import { confirmedAnswers, matchDictionary } from "./sensory";
 
 export async function requireRecipe(repo: InterviewRepository, owner: string, id: string, draft = true) {
   const recipe = await repo.getRecipe(owner, id);
@@ -58,5 +58,27 @@ export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, e
   a.questions = a.questions.filter(q => !applied.has(q.expression));
   a.pending_questions = a.pending_questions.filter(q => !applied.has(q.expression));
   await repo.saveAnalysis(owner, id, a, history.at(-1)?.id ?? null);
+  const answer = history.findLast(message => message.role === "user");
+  if (answer) {
+    const terms = confirmedAnswers(a, previous ?? undefined, answer.content);
+    try {
+      await Promise.all(terms.map(async term => {
+        const repeated = dictionary.some(entry => entry.expression === term.expression &&
+          entry.dimension === term.dimension && entry.context === term.context &&
+          entry.food_name === a.recipe.food_name && entry.resolved_value === term.interpreted_value &&
+          entry.confirmations > 0);
+        await repo.addCase(owner, {
+          recipe_id: id, message_id: answer.id, expression: term.expression,
+          dimension: term.dimension, context: term.context, food_name: a.recipe.food_name,
+          resolved_value: term.interpreted_value!, evidence: answer.content,
+          embedding: await embedding.embed(`${term.dimension}: ${term.expression}`),
+          confidence: repeated ? 0.9 : 0.6,
+        });
+      }));
+    } catch (error) {
+      console.error("sensory confirmation failed", { code: "SENSORY_SAVE_FAILED", candidates: terms.length });
+      throw error;
+    }
+  }
   return analysisDto(a);
 }

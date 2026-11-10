@@ -5,7 +5,6 @@ import { CHAT_PROMPT } from "../ai/interview-prompt";
 import type { InterviewRepository } from "../db/interview";
 import { sse } from "../sse";
 import { analyzeRecipe, requireRecipe } from "./analyze";
-import { confirmedAnswers } from "./sensory";
 import { InterviewError } from "./errors";
 
 export interface ChatInput { recipe_id: string; message: string; image_path?: string; tts: boolean }
@@ -73,14 +72,6 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
     }
     try {
       await analyzeRecipe(repo, ai, embedding, owner, input.recipe_id);
-      const analysis = await repo.getAnalysis(owner, input.recipe_id);
-      if (analysis) {
-        const dictionary = await repo.listDictionary(owner);
-        for (const term of confirmedAnswers(analysis, previous ?? undefined, input.message)) {
-          const repeats = dictionary.filter(e => e.expression === term.expression && e.dimension === term.dimension && e.context === term.context && e.food_name === analysis.recipe.food_name && e.resolved_value === term.interpreted_value).reduce((sum, e) => sum + e.confirmations, 0);
-          await repo.addCase(owner, { recipe_id: input.recipe_id, message_id: userMessageId, expression: term.expression, dimension: term.dimension, context: term.context, food_name: analysis.recipe.food_name, resolved_value: term.interpreted_value!, evidence: input.message, embedding: await embedding.embed(`${term.dimension}: ${term.expression}`), confidence: repeats ? 0.9 : 0.6 });
-        }
-      }
     } catch (error) {
       console.error("interview chat analysis failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
     }
