@@ -18,6 +18,7 @@ export interface HomeDeps {
   fetchPopular(opts: { regionCode: string | null; limit: number }): Promise<RawRecipeRow[]>;
   fetchViewer(userId: string): Promise<Viewer | null>;
   fetchInteractions(userId: string, recipeIds: string[]): Promise<InteractionSets>;
+  resolveHeroImages(rows: RawRecipeRow[]): Promise<RawRecipeRow[]>;
 }
 
 export interface HomeResponse {
@@ -39,24 +40,26 @@ export async function buildHomeResponse(
   deps: HomeDeps,
   { userId, limit, topLimit }: { userId: string | null; limit: number; topLimit: number },
 ): Promise<HomeResponse> {
-  const viewer = userId ? await deps.fetchViewer(userId) : null;
-
-  const topRows = await deps.fetchMonthlyTop({ limit: topLimit });
-  const top_recipes = topRows.map((r, i) => toTopCard(r, i + 1));
-
-  const pool = await deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL });
+  const [viewer, topRows, pool] = await Promise.all([
+    userId ? deps.fetchViewer(userId) : Promise.resolve(null),
+    deps.fetchMonthlyTop({ limit: topLimit }),
+    deps.fetchPopular({ regionCode: null, limit: RECOMMEND_POOL }),
+  ]);
   const recRows = selectRecommended(pool, {
     regionCode: viewer?.region_code ?? null,
     excludeIds: new Set(topRows.map((r) => r.id)),
     limit,
   });
 
-  const interactions =
+  const [resolvedRows, interactions] = await Promise.all([
+    deps.resolveHeroImages([...topRows, ...recRows]),
     userId && recRows.length > 0
-      ? await deps.fetchInteractions(userId, recRows.map((r) => r.id))
-      : EMPTY_INTERACTIONS;
+      ? deps.fetchInteractions(userId, recRows.map((r) => r.id))
+      : Promise.resolve(EMPTY_INTERACTIONS),
+  ]);
 
-  const recommended = recRows.map((r) => toRecommendedCard(r, interactions));
+  const top_recipes = resolvedRows.slice(0, topRows.length).map((r, i) => toTopCard(r, i + 1));
+  const recommended = resolvedRows.slice(topRows.length).map((r) => toRecommendedCard(r, interactions));
 
   return {
     greeting_name: viewer?.display_name ?? null,

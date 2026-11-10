@@ -5,6 +5,7 @@ import type { RawRecipeRow } from "./dto/recipe";
 function row(id: string, regionCode: string | null): RawRecipeRow {
   return {
     id,
+    transmitter_id: "owner",
     title: id,
     hero_image_url: null,
     transmitter_quote: null,
@@ -33,11 +34,65 @@ function makeDeps(overrides: Partial<HomeDeps> = {}): HomeDeps {
       likedIds: new Set(["rec1"]),
       savedIds: new Set<string>(),
     })),
+    resolveHeroImages: vi.fn(async (rows) => rows),
     ...overrides,
   };
 }
 
 describe("buildHomeResponse", () => {
+  it("TOP과 추천 이미지를 한 번에 해석한다", async () => {
+    const resolveHeroImages = vi.fn(async (rows: RawRecipeRow[]) => rows.map((recipe) => ({
+      ...recipe,
+      hero_image_url: `https://signed.example/${recipe.id}`,
+    })));
+    const deps = makeDeps({ resolveHeroImages });
+
+    const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 2 });
+
+    expect(resolveHeroImages).toHaveBeenCalledOnce();
+    expect(res.top_recipes.map((recipe) => recipe.hero_image_url)).toEqual([
+      "https://signed.example/top1",
+      "https://signed.example/top2",
+    ]);
+    expect(res.recommended.map((recipe) => recipe.hero_image_url)).toEqual([
+      "https://signed.example/rec1",
+      "https://signed.example/rec2",
+    ]);
+  });
+
+  it("프로필·월간 TOP·추천 후보 조회를 동시에 시작한다", async () => {
+    let finishMonthlyTop!: (rows: RawRecipeRow[]) => void;
+    const monthlyTop = new Promise<RawRecipeRow[]>((resolve) => { finishMonthlyTop = resolve; });
+    const deps = makeDeps({
+      fetchMonthlyTop: vi.fn(() => monthlyTop),
+    });
+
+    const response = buildHomeResponse(deps, { userId: "u1", limit: 10, topLimit: 2 });
+    const startedTogether = {
+      monthlyTop: vi.mocked(deps.fetchMonthlyTop).mock.calls.length,
+      viewer: vi.mocked(deps.fetchViewer).mock.calls.length,
+      popular: vi.mocked(deps.fetchPopular).mock.calls.length,
+    };
+    finishMonthlyTop(pool.slice(0, 2));
+    await response;
+
+    expect(startedTogether).toEqual({ monthlyTop: 1, viewer: 1, popular: 1 });
+    expect(deps.fetchViewer).toHaveBeenCalledWith("u1");
+  });
+
+  it("TOP과 추천 이미지 경로를 응답 URL로 변환한다", async () => {
+    const deps = makeDeps({
+      fetchMonthlyTop: vi.fn(async () => [{ ...row("top1", null), hero_image_url: "recipe-images/owner/top1/hero.webp" }]),
+      fetchPopular: vi.fn(async () => [{ ...row("rec1", null), hero_image_url: "recipe-images/owner/rec1/hero.webp" }]),
+      resolveHeroImages: vi.fn(async (rows: RawRecipeRow[]) => rows.map((recipe) => ({
+        ...recipe,
+        hero_image_url: `https://signed.example/${recipe.id}`,
+      }))),
+    });
+    const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 1 });
+    expect(res.top_recipes[0].hero_image_url).toBe("https://signed.example/top1");
+    expect(res.recommended[0].hero_image_url).toBe("https://signed.example/rec1");
+  });
   it("비인증(userId=null)이면 인사말 null, 좋아요·저장 모두 false", async () => {
     const deps = makeDeps();
     const res = await buildHomeResponse(deps, { userId: null, limit: 10, topLimit: 2 });
