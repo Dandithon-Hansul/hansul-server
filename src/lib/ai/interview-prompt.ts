@@ -454,6 +454,6 @@ export const INTERVIEW_PROMPT = `너는 일반적인 한식 전반의 손맛과 
 
 정보가 충분하면 질문을 만들기 위해 억지로 모호함을 만들어내지 않는다. 핵심 불확실성이 모두 해결되면 질문 없이 구조화 결과를 반환한다.`;
 
-export const ANALYZE_PROMPT = `${INTERVIEW_PROMPT}\n\n이번 호출은 내부 분석용이다. §9의 전체 JSON 객체만 출력한다. 미확인 값은 null 또는 unresolved로 남긴다.`;
+export const ANALYZE_PROMPT = `${INTERVIEW_PROMPT}\n\n이번 호출은 내부 분석용이다. §9의 전체 JSON 객체만 출력한다. 미확인 값은 null 또는 unresolved로 남긴다. 배열에 원소가 있다면 각 객체의 필수 필드를 생략하지 않는다. recipe.food_name은 문자열이다. recipe.ingredients의 각 원소는 name, amount, unit, original_expression, optional, confidence를 포함한다. 모르는 양과 단위는 null, optional은 불리언, confidence는 0~1이다. detected_sensory_terms의 각 원소는 interpreted_value를 포함하며 미확인 값은 null이다. questions와 pending_questions의 각 원소는 id, priority, expression, question, options, allow_free_text, allow_voice, ask_now를 포함한다. options는 2~4개, allow_free_text와 allow_voice는 true, ask_now는 불리언이다.`;
 
 export const CHAT_PROMPT = `${INTERVIEW_PROMPT}\n\n이번 호출은 사용자 대화용이다. JSON 없이 자연스러운 한국어 한두 문장으로 답하고 한 번에 질문 하나만 한다.`;
