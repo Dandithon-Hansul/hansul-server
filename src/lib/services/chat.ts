@@ -9,7 +9,7 @@ import { confirmedAnswers } from "./sensory";
 import { InterviewError } from "./errors";
 
 export interface ChatInput { recipe_id: string; message: string; image_path?: string; tts: boolean }
-export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts: TtsPort, embedding: EmbeddingPort, owner: string, input: ChatInput, send: (frame: string) => void, signal?: AbortSignal) {
+export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts: TtsPort, embedding: EmbeddingPort, owner: string, input: ChatInput, send: (frame: string) => void, signal?: AbortSignal, scheduleBackground: (job: () => Promise<void>) => void = () => {}) {
   const [recipe, previous, imageUrl, prevMessages] = await Promise.all([
     requireRecipe(repo, owner, input.recipe_id),
     repo.getAnalysis(owner, input.recipe_id),
@@ -57,26 +57,32 @@ export async function chatRecipe(repo: InterviewRepository, ai: ClaudePort, tts:
   queueAudio(sentence);
   await audioJobs;
   signal?.throwIfAborted();
-  let audioUrl: string | null = null;
-  if (segmentCount && !audioError) {
-    try { audioUrl = await repo.storeAudio(owner, input.recipe_id, `${audioId}-full`, await tts.synthesize(response)); }
-    catch (error) { audioError = error; }
-  }
-  const messageId = await repo.appendMessage(owner, input.recipe_id, { role: "assistant", content: response, audio_url: audioUrl });
-  try {
-    await analyzeRecipe(repo, ai, embedding, owner, input.recipe_id);
-    const analysis = await repo.getAnalysis(owner, input.recipe_id);
-    if (analysis) {
-      const dictionary = await repo.listDictionary(owner);
-      for (const term of confirmedAnswers(analysis, previous ?? undefined, input.message)) {
-        const repeats = dictionary.filter(e => e.expression === term.expression && e.dimension === term.dimension && e.context === term.context && e.food_name === analysis.recipe.food_name && e.resolved_value === term.interpreted_value).reduce((sum, e) => sum + e.confirmations, 0);
-        await repo.addCase(owner, { recipe_id: input.recipe_id, message_id: userMessageId, expression: term.expression, dimension: term.dimension, context: term.context, food_name: analysis.recipe.food_name, resolved_value: term.interpreted_value!, evidence: input.message, embedding: await embedding.embed(`${term.dimension}: ${term.expression}`), confidence: repeats ? 0.9 : 0.6 });
+  const messageId = await repo.appendMessage(owner, input.recipe_id, { role: "assistant", content: response, audio_url: null });
+  send(sse("done", { message_id: messageId, audio_url: null }));
+  const finalSegmentCount = segmentCount;
+  const finalAudioError = audioError;
+  scheduleBackground(async () => {
+    if (input.tts && response.trim() && finalSegmentCount && !finalAudioError) {
+      try {
+        const audio = await tts.synthesize(response);
+        const url = await repo.storeAudio(owner, input.recipe_id, `${audioId}-full`, audio);
+        await repo.updateMessageAudio(owner, input.recipe_id, messageId, url);
+      } catch (error) {
+        console.error("interview chat full audio failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
       }
     }
-  } catch (error) {
-    console.error("interview chat analysis failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
-    send(sse("error", { code: "ANALYSIS_FAILED", message: "답변은 저장됐지만 분석 갱신에 실패했습니다. 다시 분석해 주세요" }));
-  }
-  if (audioError) send(sse("error", { code: "TTS_FAILED", message: "텍스트 답변은 저장됐지만 음성 생성에 실패했습니다" }));
-  send(sse("done", { message_id: messageId, audio_url: audioUrl }));
+    try {
+      await analyzeRecipe(repo, ai, embedding, owner, input.recipe_id);
+      const analysis = await repo.getAnalysis(owner, input.recipe_id);
+      if (analysis) {
+        const dictionary = await repo.listDictionary(owner);
+        for (const term of confirmedAnswers(analysis, previous ?? undefined, input.message)) {
+          const repeats = dictionary.filter(e => e.expression === term.expression && e.dimension === term.dimension && e.context === term.context && e.food_name === analysis.recipe.food_name && e.resolved_value === term.interpreted_value).reduce((sum, e) => sum + e.confirmations, 0);
+          await repo.addCase(owner, { recipe_id: input.recipe_id, message_id: userMessageId, expression: term.expression, dimension: term.dimension, context: term.context, food_name: analysis.recipe.food_name, resolved_value: term.interpreted_value!, evidence: input.message, embedding: await embedding.embed(`${term.dimension}: ${term.expression}`), confidence: repeats ? 0.9 : 0.6 });
+        }
+      }
+    } catch (error) {
+      console.error("interview chat analysis failed", { code: error instanceof InterviewError ? error.code : "INTERVIEW_FAILED" });
+    }
+  });
 }

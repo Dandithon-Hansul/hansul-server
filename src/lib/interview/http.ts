@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { z } from "zod";
 import type { InterviewRepository } from "../db/interview";
 import type { ClaudePort } from "../ai/claude";
@@ -57,7 +58,7 @@ export function createInterviewHandlers(d: InterviewDependencies) {
         const stream = new ReadableStream<Uint8Array>({
           async start(controller) {
             const send = (frame: string) => { if (!abort.signal.aborted) controller.enqueue(encoder.encode(frame)); };
-            try { await chatRecipe(d.repo, d.ai, d.tts, d.embedding, user, input, send, abort.signal); }
+            try { await chatRecipe(d.repo, d.ai, d.tts, d.embedding, user, input, send, abort.signal, job => after(job)); }
             catch (error) {
               const code = error instanceof InterviewError ? error.code : error instanceof Error && error.message === "INTERVIEW_DATABASE_ERROR" ? "INTERVIEW_DATABASE_ERROR" : "INTERVIEW_FAILED";
               console.error("interview chat failed", { stage: "stream", code });

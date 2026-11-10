@@ -76,3 +76,20 @@ describe("profile vector ownership", () => {
     await expect(repo.saveProfileVector(owner, Array(1536).fill(0.1))).rejects.toMatchObject({ status: 404, code: "PROFILE_NOT_FOUND" });
   });
 });
+
+describe("assistant audio update", () => {
+  it("소유한 레시피의 지정된 assistant 메시지만 갱신한다", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: "message-id" }, error: null });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
+    const query = { eq: vi.fn(), select };
+    query.eq.mockReturnValue(query);
+    const update = vi.fn().mockReturnValue(query);
+    const repo = new SupabaseInterviewRepository({ from: () => ({ update }) } as unknown as SupabaseClient);
+    vi.spyOn(repo, "getRecipe").mockResolvedValue({ id: "recipe", transmitter_id: owner, status: "draft", visibility: "private", transcript: null });
+
+    await repo.updateMessageAudio(owner, "recipe", "message-id", "https://signed.test/audio");
+
+    expect(update).toHaveBeenCalledWith({ audio_url: "https://signed.test/audio" });
+    expect(query.eq.mock.calls).toEqual([["id", "message-id"], ["recipe_id", "recipe"], ["role", "assistant"]]);
+  });
+});

@@ -20,6 +20,7 @@ export interface InterviewRepository {
   saveProfileVector(owner: string, vector: number[]): Promise<void>;
   saveAnalysis(owner: string, id: string, analysis: Analysis, lastMessageId: string | null): Promise<void>;
   appendMessage(owner: string, id: string, message: ChatMessage & { audio_url?: string | null }): Promise<string>;
+  updateMessageAudio(owner: string, id: string, messageId: string, audioUrl: string): Promise<void>;
   addCase(owner: string, item: SensoryCase): Promise<void>;
   countConfirmed(owner: string, id: string): Promise<number>;
   publish(owner: string, id: string, expectedAnalysis: Analysis, quote?: string): Promise<PublishResult>;

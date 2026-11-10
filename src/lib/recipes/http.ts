@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const recipeIdSchema = z.uuid();
+export const recipeIdSchema = z.guid();
 const headers = { "Cache-Control": "private, no-store" };
 
 export function recipeJson(body: unknown, status = 200) {
