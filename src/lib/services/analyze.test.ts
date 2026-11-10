@@ -4,8 +4,34 @@ import { analysisFixture } from "../ai/__fakes__/analysis.fixture";
 import { FakeClaude } from "../ai/__fakes__/claude.fake";
 import { FakeEmbedding } from "../ai/__fakes__/embedding.fake";
 import { FakeInterviewRepository } from "../db/__fakes__/interview.fake";
+import type { ClaudePort } from "../ai/claude";
 
 describe("analyzeRecipe", () => {
+  it("DB 조회·AI·후처리·저장 구간의 시간을 기록한다", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      await analyzeRecipe(new FakeInterviewRepository(), new FakeClaude(), new FakeEmbedding(), "owner", "recipe");
+      expect(log).toHaveBeenCalledWith("recipe analysis timing", expect.objectContaining({
+        recipe_ms: expect.any(Number), lookup_ms: expect.any(Number), ai_ms: expect.any(Number),
+        postprocess_ms: expect.any(Number), save_ms: expect.any(Number), total_ms: expect.any(Number),
+      }));
+    } finally { log.mockRestore(); }
+  });
+  it("모델 입력에서 임베딩을 제외하고 서버 사전 매칭에는 보존한다", async () => {
+    const repo = new FakeInterviewRepository();
+    const ai = new FakeClaude();
+    repo.dictionary = [{ id: "case-1", expression: "쪼매", dimension: "salt_intensity", context: "나물 간하기", food_name: "나물무침", resolved_value: "찻숟가락 반", confidence: 0.6, confirmations: 1, embedding: [0.1, 0.2] }];
+    const analyze = vi.spyOn(ai as ClaudePort, "analyzeJson");
+
+    await analyzeRecipe(repo, ai, new FakeEmbedding(), "owner", "recipe");
+
+    expect(analyze.mock.calls[0][0].dictionary[0]).not.toHaveProperty("embedding");
+    expect(JSON.stringify(analyze.mock.calls[0][0]).length).toBeLessThan(JSON.stringify({
+      ...analyze.mock.calls[0][0], dictionary: repo.dictionary,
+    }).length);
+    expect(repo.analysis?.auto_applied[0]).toMatchObject({ dictionary_entry_id: "case-1", applied_value: "찻숟가락 반" });
+    expect(repo.dictionary[0].embedding).toEqual([0.1, 0.2]);
+  });
   it("소유자 초안을 구조화하고 내부 자료는 반환하지 않는다", async () => {
     const repo = new FakeInterviewRepository();
     const result = await analyzeRecipe(repo, new FakeClaude(), new FakeEmbedding(), "owner", "recipe");

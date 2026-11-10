@@ -81,8 +81,33 @@ describe("chatRecipe", () => {
     await scheduledJob!();
     expect(repo.messages[1].audio_url).toContain("full");
   });
+  it("전체 음성이 지연돼도 선택지 분석을 시작한다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
+    let releaseAudio!: () => void;
+    const audioGate = new Promise<void>(resolve => { releaseAudio = resolve; });
+    vi.spyOn(tts, "synthesize").mockImplementation(async text => {
+      if (text === "첫 문장. 둘째 문장?") await audioGate;
+      return Buffer.from("mp3");
+    });
+    vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => {
+      chunk("첫 문장. "); chunk("둘째 문장?"); return "첫 문장. 둘째 문장?";
+    });
+    const analyze = vi.spyOn(ai, "analyzeJson");
+    let scheduledJob: (() => Promise<void>) | null = null;
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "설명", tts: true }, () => {}, undefined,
+      job => { scheduledJob = job; });
+    const job = scheduledJob!();
+    try {
+      await vi.waitFor(() => expect(analyze).toHaveBeenCalledOnce(), { timeout: 1000 });
+    } finally {
+      releaseAudio();
+      await job;
+    }
+  });
   it("전체 TTS 실패 시 답변을 보존하고 SSE에 오류를 보내지 않는다", async () => {
     const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
+    const analyze = vi.spyOn(ai, "analyzeJson");
     vi.spyOn(tts, "synthesize").mockImplementation(async text => {
       if (text === "첫 문장. 둘째 문장?") throw new Error("TTS unavailable");
       return Buffer.from("mp3");
@@ -99,6 +124,8 @@ describe("chatRecipe", () => {
     expect(frames.some(frame => frame.includes('"code":"TTS_FAILED"'))).toBe(false);
     expect(frames.at(-1)).toContain('"audio_url":null');
     expect(scheduledJob).not.toBeNull();
+    await scheduledJob!();
+    expect(analyze).toHaveBeenCalledOnce();
   });
   it("이미지 소유권 확인 실패 시 메시지를 저장하지 않는다", async () => {
     const repo = new FakeInterviewRepository(); vi.spyOn(repo, "resolveImage").mockRejectedValue(new Error("forbidden"));

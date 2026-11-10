@@ -59,6 +59,7 @@ describe("POST /api/analyze", () => {
   });
 
   it("TC-I-01: 정상 분석 → 200", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
     mocks.deps.mockResolvedValue(makeDeps("user-1"));
     const r = await POST(new Request("http://localhost/api/analyze", {
       method: "POST",
@@ -70,6 +71,8 @@ describe("POST /api/analyze", () => {
       expect.anything(), expect.anything(), expect.anything(),
       "user-1", RECIPE_ID,
     );
+    expect(log).toHaveBeenCalledWith("recipe analysis request timing", expect.objectContaining({ auth_ms: expect.any(Number), total_ms: expect.any(Number), status: 200 }));
+    log.mockRestore();
   });
 
   it("추가 필드 포함 (strict 위반) → 422", async () => {
