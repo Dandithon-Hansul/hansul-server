@@ -219,7 +219,7 @@ POST /api/stt
 Content-Type: application/json
 
 Body:
-  { audio_path: string, recipe_id?: UUID } 또는
+  { audio_path: string, recipe_id?: UUID, transcribe_only?: boolean } 또는
   { transcript: string, recipe_id?: UUID }
 
 Response 200:
@@ -233,6 +233,8 @@ Error:
   413  오디오 크기 초과
   415  지원하지 않는 포맷
 ```
+
+채팅 음성 답변은 `{ audio_path, transcribe_only: true }`로 요청한다. 응답은 `{ transcript: string }`이며 레시피, 감각어 분석 결과, 채팅 기록을 수정하지 않는다. 받은 텍스트를 채팅에 보내려면 별도로 `POST /api/chat`을 호출한다.
 
 ---
 
