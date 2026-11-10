@@ -10,6 +10,18 @@ function adapter(create: ReturnType<typeof vi.fn>) {
   return new ClaudeAdapter({ messages: { create } } as unknown as Anthropic, "test-model");
 }
 describe("ClaudeAdapter", () => {
+  it("호출별 지연과 입력·출력·캐시 토큰을 기록한다", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    const create = vi.fn().mockResolvedValue({ ...reply(JSON.stringify(analysisFixture())), usage: { input_tokens: 100, output_tokens: 200, cache_creation_input_tokens: 300, cache_read_input_tokens: 400 } });
+    try {
+      await adapter(create).analyzeJson(input);
+      expect(log).toHaveBeenCalledWith("anthropic analysis usage", expect.objectContaining({
+        model: "test-model", attempt: 1, input_tokens: 100, output_tokens: 200,
+        cache_creation_input_tokens: 300, cache_read_input_tokens: 400,
+        duration_ms: expect.any(Number), input_json_bytes: expect.any(Number),
+      }));
+    } finally { log.mockRestore(); }
+  });
   it("전체 분석 JSON을 검증하고 시스템 프롬프트 캐시를 요청한다", async () => {
     const create = vi.fn().mockResolvedValue(reply(JSON.stringify(analysisFixture())));
     const result = await adapter(create).analyzeJson(input);

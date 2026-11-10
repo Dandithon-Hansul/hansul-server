@@ -26,14 +26,23 @@ export function analysisDto(a: Analysis) {
   };
 }
 export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, embedding: EmbeddingPort, owner: string, id: string) {
+  const started = performance.now();
   const recipe = await requireRecipe(repo, owner, id);
   if (!recipe.transcript?.trim()) throw new InterviewError(422, "TRANSCRIPT_REQUIRED", "먼저 녹음 또는 텍스트를 저장해 주세요");
+  const recipe_ms = Math.round(performance.now() - started);
+  const lookupStarted = performance.now();
   const [history, dictionary, previous] = await Promise.all([
     repo.listMessages(owner, id),
     repo.listDictionary(owner),
     repo.getAnalysis(owner, id),
   ]);
-  const a = analysisSchema.parse(await ai.analyzeJson({ transcript: recipe.transcript, dictionary, history, previous_analysis: previous ?? undefined }));
+  const lookup_ms = Math.round(performance.now() - lookupStarted);
+  const aiStarted = performance.now();
+  const modelDictionary = dictionary.map(({ id, expression, dimension, context, food_name, resolved_value, confidence, confirmations }) =>
+    ({ id, expression, dimension, context, food_name, resolved_value, confidence, confirmations }));
+  const a = analysisSchema.parse(await ai.analyzeJson({ transcript: recipe.transcript, dictionary: modelDictionary, history, previous_analysis: previous ?? undefined }));
+  const ai_ms = Math.round(performance.now() - aiStarted);
+  const postprocessStarted = performance.now();
   a.auto_applied = [];
   const matches = await Promise.all(a.detected_sensory_terms.map(async term => {
     const exact = matchDictionary(term, a.recipe.food_name, null, dictionary);
@@ -57,6 +66,8 @@ export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, e
   const applied = new Set(a.auto_applied.map(e => e.expression));
   a.questions = a.questions.filter(q => !applied.has(q.expression));
   a.pending_questions = a.pending_questions.filter(q => !applied.has(q.expression));
+  const postprocess_ms = Math.round(performance.now() - postprocessStarted);
+  const saveStarted = performance.now();
   await repo.saveAnalysis(owner, id, a, history.at(-1)?.id ?? null);
   const answer = history.findLast(message => message.role === "user");
   if (answer) {
@@ -80,5 +91,7 @@ export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, e
       throw error;
     }
   }
+  console.info("recipe analysis timing", { recipe_ms, lookup_ms, ai_ms, postprocess_ms,
+    save_ms: Math.round(performance.now() - saveStarted), total_ms: Math.round(performance.now() - started) });
   return analysisDto(a);
 }
