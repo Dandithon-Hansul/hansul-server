@@ -134,3 +134,29 @@ describe("processStt — audio_path 경로", () => {
     expect(fileArg.type).toBe("audio/mp4");
   });
 });
+
+describe("processStt — 전사 전용 모드", () => {
+  it("오디오 경로 없이 전사 전용 모드를 요청하면 저장하지 않는다", async () => {
+    const input = { transcript: "소고기 국", transcribe_only: true };
+    const res = await processStt("user1", input);
+    expect(res.status).toBe(400);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "123e4567-e89b-12d3-a456-426614174000"])(
+    "recipe_id가 %s일 때 전사만 수행한다",
+    async (recipe_id) => {
+      const input = {
+        audio_path: "uploads/user1/stt_audio/reply.webm",
+        transcribe_only: true,
+        recipe_id,
+      };
+      const res = await processStt("user1", input);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ transcript: "소고기 국을 끓여요" });
+      expect(mockDownload).toHaveBeenCalledWith("user1/stt_audio/reply.webm");
+      expect(mockTranscribe).toHaveBeenCalledOnce();
+      expect(mockFrom).not.toHaveBeenCalled();
+    },
+  );
+});

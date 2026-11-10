@@ -322,7 +322,13 @@ export const openApiDocument = {
         requestBody: jsonBody({
           type: "object",
           additionalProperties: true,
-          description: "전사 요청 본문",
+          description: "transcribe_only가 true이면 audio_path가 필요하며 전사 결과만 반환합니다.",
+          properties: {
+            audio_path: { type: "string" },
+            transcript: { type: "string" },
+            recipe_id: { type: "string", format: "uuid" },
+            transcribe_only: { type: "boolean", default: false },
+          },
         }),
         responses: { "200": successResponse(), "400": errorResponse },
       },

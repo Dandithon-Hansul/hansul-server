@@ -6,8 +6,16 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { recipeError, recipeJson } from "@/lib/recipes/http";
 
 const bodySchema = z.union([
-  z.object({ audio_path: z.string().min(1), recipe_id: z.uuid().optional() }),
-  z.object({ transcript: z.string().min(1), recipe_id: z.uuid().optional() }),
+  z.object({
+    audio_path: z.string().min(1),
+    recipe_id: z.uuid().optional(),
+    transcribe_only: z.boolean().optional(),
+  }),
+  z.object({
+    transcript: z.string().min(1),
+    recipe_id: z.uuid().optional(),
+    transcribe_only: z.literal(false).optional(),
+  }),
 ]);
 
 export type SttInput = z.infer<typeof bodySchema>;
@@ -70,7 +78,7 @@ async function updateDraft(userId: string, recipeId: string, transcript: string,
   if (error) throw new Error("DB_UPDATE_FAILED");
 }
 
-export async function processStt(userId: string | null, input: SttInput) {
+export async function processStt(userId: string | null, input: unknown) {
   if (!userId) return recipeError(401, "UNAUTHORIZED", "인증이 필요합니다");
 
   const parsed = bodySchema.safeParse(input);
@@ -87,6 +95,7 @@ export async function processStt(userId: string | null, input: SttInput) {
       return recipeError(400, "INVALID_AUDIO_PATH", "오디오 경로가 올바르지 않습니다");
     }
     transcript = await transcribeAudio(userId, audioPath);
+    if (parsed.data.transcribe_only) return recipeJson({ transcript });
   } else {
     transcript = parsed.data.transcript;
   }
