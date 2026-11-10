@@ -22,24 +22,18 @@ describe("ClaudeAdapter", () => {
     expect(result.recipe.food_types).toEqual(["나물"]);
     expect(create).toHaveBeenCalledTimes(1);
   });
-  it("분석 응답에 필수 재료·질문 필드를 강제하는 JSON 스키마를 요청한다", async () => {
-    const create = vi.fn().mockResolvedValue(reply(JSON.stringify(analysisFixture())));
-    await adapter(create).analyzeJson(input);
-    const format = create.mock.calls[0][0].output_config?.format;
-    expect(format?.type).toBe("json_schema");
-    const definitions = format.schema.$defs as Record<string, Record<string, unknown>>;
-    function resolve(value: unknown): Record<string, unknown> {
-      const node = value as Record<string, unknown>;
-      const ref = node.$ref;
-      return typeof ref === "string" ? definitions[ref.split("/").at(-1)!] : node;
-    }
-    const recipe = resolve(resolve(format.schema.properties).recipe);
-    const ingredient = resolve(resolve(resolve(recipe.properties).ingredients).items);
-    const question = resolve(resolve(resolve(format.schema.properties).questions).items);
-    expect(ingredient.required)
-      .toEqual(expect.arrayContaining(["original_expression", "optional", "confidence"]));
-    expect(question.required)
-      .toEqual(expect.arrayContaining(["id", "options", "allow_free_text", "allow_voice", "ask_now"]));
+  it("필수 필드가 누락되면 해당 경로를 알려 재시도한다", async () => {
+    const incomplete = JSON.parse(JSON.stringify(analysisFixture()));
+    delete incomplete.recipe.ingredients[0].original_expression;
+    delete incomplete.questions[0].options;
+    const create = vi.fn().mockResolvedValueOnce(reply(JSON.stringify(incomplete)))
+      .mockImplementation(async (request) => {
+        const retry = request.messages[0].content[0].text;
+        return reply(retry.includes("original_expression") && retry.includes("questions") && retry.includes("options")
+          ? JSON.stringify(analysisFixture()) : JSON.stringify(incomplete));
+      });
+    await expect(adapter(create).analyzeJson(input)).resolves.toMatchObject({ recipe: { food_name: "나물무침" } });
+    expect(create).toHaveBeenCalledTimes(2);
   });
   it("형식 오류만 한 번 재시도한다", async () => {
     const create = vi.fn().mockResolvedValueOnce(reply("설명문")).mockResolvedValueOnce(reply(JSON.stringify(analysisFixture())));
