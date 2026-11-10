@@ -375,16 +375,7 @@ export const INTERVIEW_PROMPT = `너는 일반적인 한식 전반의 손맛과 
       "room_temperature_c": null,
       "humidity_sensitive": false
     },
-    "ingredients": [
-      {
-        "name": "",
-        "amount": null,
-        "unit": null,
-        "original_expression": "",
-        "optional": false,
-        "confidence": 0.0
-      }
-    ],
+    "ingredients": [],
     "steps": [
       {
         "order": 1,
@@ -419,18 +410,7 @@ export const INTERVIEW_PROMPT = `너는 일반적인 한식 전반의 손맛과 
       "reason": "같은 전승자·같은 조리 문맥"
     }
   ],
-  "questions": [
-    {
-      "id": "",
-      "priority": "P0",
-      "expression": "",
-      "question": "",
-      "options": [],
-      "allow_free_text": true,
-      "allow_voice": true,
-      "ask_now": true
-    }
-  ],
+  "questions": [],
   "pending_questions": [],
   "card": {
     "must_keep": [],
