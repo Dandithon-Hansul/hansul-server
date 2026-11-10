@@ -30,7 +30,8 @@ export class ClaudeAdapter implements ClaudePort {
       }).catch(aiFailure);
       if (response.stop_reason !== "end_turn") throw new InterviewError(502, "AI_ANALYSIS_INCOMPLETE", "AI 분석이 완료되지 않았습니다. 다시 시도해 주세요");
       const text = response.content.filter(b => b.type === "text").map(b => b.text).join("");
-      try { return analysisSchema.parse(JSON.parse(text)); }
+      const fenced = text.trim().match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i);
+      try { return analysisSchema.parse(JSON.parse(fenced ? fenced[1] : text)); }
       catch { if (attempt) throw new InterviewError(502, "AI_RESPONSE_INVALID", "AI 분석 결과를 처리하지 못했습니다. 다시 시도해 주세요"); }
     }
     throw new Error("AI_ANALYSIS_INVALID");
