@@ -24,9 +24,9 @@ describe("chatRecipe", () => {
     await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, s => frames.push(s));
     expect(frames.slice(0, 2).every(f => f.startsWith("event: chunk"))).toBe(true);
     expect(frames.filter(f => f.startsWith("event: audio")).map(f => JSON.parse(f.split("data: ")[1]).sequence)).toEqual([1, 2]);
-    expect(frames.at(-1)).toContain("-full.mp3");
-    expect(tts.synthesize).toHaveBeenCalledTimes(3);
-    expect(repo.messages[1].audio_url).toContain("full");
+    expect(frames.at(-1)).toContain('"audio_url":null');
+    expect(tts.synthesize).toHaveBeenCalledTimes(2); // 문장별 2번 (전체 음성은 scheduleBackground에서)
+    expect(repo.messages[1].audio_url).toBeNull();
   });
   it("한 청크 안의 여러 문장과 청크 사이 소수점을 구분한다", async () => {
     const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
@@ -36,10 +36,10 @@ describe("chatRecipe", () => {
     });
     await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: true }, () => {});
     expect(synth.mock.calls.map(c => c[0]).sort()).toEqual([
-      "소금 0.5g이에요.", "다음 문장.", "마지막 문장?", "소금 0.5g이에요. 다음 문장. 마지막 문장?",
-    ].sort());
+      "소금 0.5g이에요.", "다음 문장.", "마지막 문장?",
+    ].sort()); // 전체 텍스트 합성은 scheduleBackground에서 실행
   });
-  it("전체 TTS와 분석을 병렬로 실행하고 둘 다 끝난 뒤 done에 음성 URL을 보낸다", async () => {
+  it("done이 분析·전체 음성 완료 전에 즉시 발송되고 audio_url은 null이다", async () => {
     const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
@@ -52,18 +52,36 @@ describe("chatRecipe", () => {
       chunk("첫 문장. "); chunk("둘째 문장?"); return "첫 문장. 둘째 문장?";
     });
     const analyze = vi.spyOn(ai, "analyzeJson");
+    let scheduledJob: (() => Promise<void>) | null = null;
+    const scheduleBackground = (job: () => Promise<void>) => { scheduledJob = job; };
     const frames: string[] = [];
-    const chat = chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner",
-      { recipe_id: "recipe", message: "설명", tts: true }, frame => frames.push(frame));
-    try {
-      await vi.waitFor(() => expect(fullStarted).toBe(true));
-      await vi.waitFor(() => expect(analyze).toHaveBeenCalled());
-      expect(frames.some(frame => frame.includes("event: done"))).toBe(false);
-    } finally { release(); }
-    await chat;
-    expect(frames.at(-1)).toContain("-full.mp3");
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "설명", tts: true }, frame => frames.push(frame), undefined, scheduleBackground);
+    // done이 scheduleBackground 등록 직후 즉시 발송됨
+    expect(frames.at(-1)).toContain("event: done");
+    expect(frames.at(-1)).toContain('"audio_url":null');
+    // 분析과 전체 음성은 아직 실행 안 됨 (scheduleBackground에 등록만 됨)
+    expect(fullStarted).toBe(false);
+    expect(analyze).not.toHaveBeenCalled();
+    expect(scheduledJob).not.toBeNull();
+    release();
   });
-  it("전체 TTS 실패 시 답변을 보존하고 음성 오류를 알린다", async () => {
+  it("scheduleBackground가 완료되면 메시지 audio_url이 업데이트된다", async () => {
+    const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
+    vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => {
+      chunk("첫 문장. "); chunk("둘째 문장?"); return "첫 문장. 둘째 문장?";
+    });
+    let scheduledJob: (() => Promise<void>) | null = null;
+    const scheduleBackground = (job: () => Promise<void>) => { scheduledJob = job; };
+    const frames: string[] = [];
+    await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner",
+      { recipe_id: "recipe", message: "설명", tts: true }, s => frames.push(s), undefined, scheduleBackground);
+    expect(frames.at(-1)).toContain('"audio_url":null');
+    expect(scheduledJob).not.toBeNull();
+    await scheduledJob!();
+    expect(repo.messages[1].audio_url).toContain("full");
+  });
+  it("전체 TTS 실패 시 답변을 보존하고 SSE에 오류를 보내지 않는다", async () => {
     const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const tts = new FakeTts();
     vi.spyOn(tts, "synthesize").mockImplementation(async text => {
       if (text === "첫 문장. 둘째 문장?") throw new Error("TTS unavailable");
@@ -72,12 +90,15 @@ describe("chatRecipe", () => {
     vi.spyOn(ai, "chatStream").mockImplementation(async (_m, _p, chunk) => {
       chunk("첫 문장. "); chunk("둘째 문장?"); return "첫 문장. 둘째 문장?";
     });
+    let scheduledJob: (() => Promise<void>) | null = null;
+    const scheduleBackground = (job: () => Promise<void>) => { scheduledJob = job; };
     const frames: string[] = [];
     await chatRecipe(repo, ai, tts, new FakeEmbedding(), "owner",
-      { recipe_id: "recipe", message: "설명", tts: true }, frame => frames.push(frame));
+      { recipe_id: "recipe", message: "설명", tts: true }, frame => frames.push(frame), undefined, scheduleBackground);
     expect(repo.messages[1].audio_url).toBeNull();
-    expect(frames.some(frame => frame.includes('"code":"TTS_FAILED"'))).toBe(true);
+    expect(frames.some(frame => frame.includes('"code":"TTS_FAILED"'))).toBe(false);
     expect(frames.at(-1)).toContain('"audio_url":null');
+    expect(scheduledJob).not.toBeNull();
   });
   it("이미지 소유권 확인 실패 시 메시지를 저장하지 않는다", async () => {
     const repo = new FakeInterviewRepository(); vi.spyOn(repo, "resolveImage").mockRejectedValue(new Error("forbidden"));
@@ -114,35 +135,29 @@ describe("chatRecipe", () => {
     resolveRecipe();
     await chatPromise;
   });
-  it("분석이 완료될 때까지 done을 보내지 않아 다음 채팅의 상태 유실을 막는다", async () => {
-    const repo = new FakeInterviewRepository();
-    const ai = new FakeClaude();
-    let finishAnalysis!: (value: ReturnType<typeof analysisFixture>) => void;
-    vi.spyOn(ai, "analyzeJson").mockReturnValue(new Promise(resolve => { finishAnalysis = resolve; }));
-    const frames: string[] = [];
-    const chat = chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
-      { recipe_id: "recipe", message: "테스트", tts: false }, s => frames.push(s));
-    await vi.waitFor(() => expect(finishAnalysis).toBeTypeOf("function"));
-    expect(frames.some(frame => frame.includes("event: done"))).toBe(false);
-    finishAnalysis(analysisFixture());
-    await chat;
-    expect(frames.at(-1)).toContain("event: done");
-  });
-  it("분석 실패를 SSE에 알리고 저장된 답변의 완료 이벤트를 유지한다", async () => {
+  it("scheduleBackground에서 분析이 실패해도 답변과 done은 유지된다", async () => {
     const repo = new FakeInterviewRepository(); const ai = new FakeClaude();
-    const frames: string[] = [];
     vi.spyOn(ai, "analyzeJson").mockRejectedValue(new Error("analysis failed"));
+    let scheduledJob: (() => Promise<void>) | null = null;
+    const scheduleBackground = (job: () => Promise<void>) => { scheduledJob = job; };
+    const frames: string[] = [];
     await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
-      { recipe_id: "recipe", message: "테스트", tts: false }, s => frames.push(s));
-    expect(frames.some(frame => frame.includes('"code":"ANALYSIS_FAILED"'))).toBe(true);
+      { recipe_id: "recipe", message: "테스트", tts: false }, s => frames.push(s), undefined, scheduleBackground);
     expect(frames.at(-1)).toContain("event: done");
+    expect(frames.some(frame => frame.includes('"code":"ANALYSIS_FAILED"'))).toBe(false);
+    expect(scheduledJob).not.toBeNull();
+    await expect(scheduledJob!()).resolves.toBeUndefined();
+    expect(repo.messages.map(m => m.role)).toEqual(["user", "assistant"]);
   });
-  it("사용자가 직접 확인한 답변은 background 분석 완료 후 저장된다", async () => {
+  it("사용자가 직접 확인한 답변은 background 분析 완료 후 저장된다", async () => {
     const repo = new FakeInterviewRepository(); repo.analysis = analysisFixture();
     const ai = new FakeClaude(); const a = analysisFixture(); a.questions = []; a.card.unresolved = [];
     Object.assign(a.detected_sensory_terms[0], { source: "user_answer", interpreted_value: "찻숟가락 반", needs_confirmation: false });
     vi.spyOn(ai, "analyzeJson").mockResolvedValue(a);
-    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "찻숟가락 반 넣어요", tts: false }, () => {});
+    let scheduledJob: (() => Promise<void>) | null = null;
+    const scheduleBackground = (job: () => Promise<void>) => { scheduledJob = job; };
+    await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "찻숟가락 반 넣어요", tts: false }, () => {}, undefined, scheduleBackground);
+    await scheduledJob!();
     expect(repo.cases[0]).toMatchObject({ resolved_value: "찻숟가락 반", evidence: "찻숟가락 반 넣어요", message_id: "message-1" });
   });
   it("이미지 소유권 확인 실패 시 메시지를 저장하지 않는다", async () => {
@@ -157,7 +172,7 @@ describe("chatRecipe", () => {
     await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: false }, () => {});
     expect(repo.messages.map(m => m.role)).toEqual(["user", "assistant"]);
   });
-  it("답변 저장 후 분석 실패는 저장된 답변의 완료 이벤트를 막지 않는다", async () => {
+  it("답변 저장 후 분析 실패는 저장된 답변의 완료 이벤트를 막지 않는다", async () => {
     const repo = new FakeInterviewRepository(); const ai = new FakeClaude(); const frames: string[] = [];
     vi.spyOn(ai, "analyzeJson").mockRejectedValue(new Error("analysis failed"));
     await chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner", { recipe_id: "recipe", message: "설명", tts: false }, s => frames.push(s));
