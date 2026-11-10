@@ -22,6 +22,25 @@ describe("ClaudeAdapter", () => {
     expect(result.recipe.food_types).toEqual(["나물"]);
     expect(create).toHaveBeenCalledTimes(1);
   });
+  it("분석 응답에 필수 재료·질문 필드를 강제하는 JSON 스키마를 요청한다", async () => {
+    const create = vi.fn().mockResolvedValue(reply(JSON.stringify(analysisFixture())));
+    await adapter(create).analyzeJson(input);
+    const format = create.mock.calls[0][0].output_config?.format;
+    expect(format?.type).toBe("json_schema");
+    const definitions = format.schema.$defs as Record<string, Record<string, unknown>>;
+    function resolve(value: unknown): Record<string, unknown> {
+      const node = value as Record<string, unknown>;
+      const ref = node.$ref;
+      return typeof ref === "string" ? definitions[ref.split("/").at(-1)!] : node;
+    }
+    const recipe = resolve(resolve(format.schema.properties).recipe);
+    const ingredient = resolve(resolve(resolve(recipe.properties).ingredients).items);
+    const question = resolve(resolve(resolve(format.schema.properties).questions).items);
+    expect(ingredient.required)
+      .toEqual(expect.arrayContaining(["original_expression", "optional", "confidence"]));
+    expect(question.required)
+      .toEqual(expect.arrayContaining(["id", "options", "allow_free_text", "allow_voice", "ask_now"]));
+  });
   it("형식 오류만 한 번 재시도한다", async () => {
     const create = vi.fn().mockResolvedValueOnce(reply("설명문")).mockResolvedValueOnce(reply(JSON.stringify(analysisFixture())));
     await adapter(create).analyzeJson(input);
