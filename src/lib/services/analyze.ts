@@ -28,9 +28,11 @@ export function analysisDto(a: Analysis) {
 export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, embedding: EmbeddingPort, owner: string, id: string) {
   const recipe = await requireRecipe(repo, owner, id);
   if (!recipe.transcript?.trim()) throw new InterviewError(422, "TRANSCRIPT_REQUIRED", "먼저 녹음 또는 텍스트를 저장해 주세요");
-  const history = await repo.listMessages(owner, id);
-  const dictionary = await repo.listDictionary(owner);
-  const previous = await repo.getAnalysis(owner, id);
+  const [history, dictionary, previous] = await Promise.all([
+    repo.listMessages(owner, id),
+    repo.listDictionary(owner),
+    repo.getAnalysis(owner, id),
+  ]);
   const a = analysisSchema.parse(await ai.analyzeJson({ transcript: recipe.transcript, dictionary, history, previous_analysis: previous ?? undefined }));
   a.auto_applied = [];
   const matches = await Promise.all(a.detected_sensory_terms.map(async term => {

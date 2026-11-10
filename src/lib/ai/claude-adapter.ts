@@ -9,7 +9,7 @@ import { ANALYZE_PROMPT } from "./interview-prompt";
 function aiFailure(error: unknown): never {
   if (error instanceof Anthropic.APIConnectionTimeoutError) throw new InterviewError(504, "AI_TIMEOUT", "AI 응답 시간이 초과됐습니다. 다시 시도해 주세요");
   if (error instanceof Anthropic.APIError) {
-    console.error("Anthropic API error", { status: error.status, message: error.message });
+    console.error("Anthropic API error", { status: error.status });
     if (error.status === 402) throw new InterviewError(402, "AI_QUOTA_EXCEEDED", "AI 서비스 사용 한도를 확인해 주세요");
     if (error.status === 429) throw new InterviewError(429, "AI_RATE_LIMITED", "AI 요청이 많습니다. 잠시 후 다시 시도해 주세요");
     throw new InterviewError(502, "AI_UPSTREAM_ERROR", "AI 서비스 연결에 실패했습니다. 잠시 후 다시 시도해 주세요");
@@ -50,17 +50,17 @@ export class ClaudeAdapter implements ClaudePort {
         return analysisSchema.parse(parsed);
       }
       catch (error) {
-        if (attempt === 2) throw new InterviewError(502, "AI_RESPONSE_INVALID", "AI 분석 결과를 처리하지 못했습니다. 다시 시도해 주세요");
         if (error instanceof ZodError) {
           const fields = [...new Set(error.issues.map(issue => {
             const path = issue.path.join(".").replace(/\.\d+/g, "[]") || "root";
             return `${path} (${issue.code === "invalid_type" ? issue.expected : issue.code === "invalid_value" ? JSON.stringify(issue.values) : issue.code})`;
           }))];
+          console.warn("AI analysis schema validation failed", { code: "AI_RESPONSE_INVALID", attempt: attempt + 1, fields });
           retryDetails = `\n이전 응답에서 다음 필드가 검증에 실패했습니다: ${fields.join(", ")}. 각 객체의 필수 필드와 타입을 모두 채워 주세요.`;
         }
       }
     }
-    throw new Error("AI_ANALYSIS_INVALID");
+    throw new InterviewError(502, "AI_RESPONSE_INVALID", "AI 분석 결과를 처리하지 못했습니다. 다시 시도해 주세요");
   }
   async chatStream(messages: ChatMessage[], systemPrompt: string, onChunk: (text: string) => void, signal?: AbortSignal) {
     const stream = this.client.messages.stream({
