@@ -58,7 +58,8 @@ export async function withProfile(
     if (error && error.status !== 400 && error.status !== 401 && error.status !== 403) throw error;
     if (error || !data.user) return profileError(401, "UNAUTHORIZED", "유효한 로그인이 필요합니다.");
     return await run(createSupabaseAdminClient(), data.user.id);
-  } catch {
+  } catch (error) {
+    console.error("profile request failed", error instanceof Error ? { message: error.message, name: error.name } : error);
     return profileError(500, "INTERNAL_ERROR", "프로필 요청을 처리하지 못했습니다.");
   }
 }
