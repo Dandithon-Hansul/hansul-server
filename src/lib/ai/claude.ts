@@ -18,7 +18,7 @@ export interface ChatMessage {
 }
 export interface AnalyzeInput {
   transcript: string;
-  dictionary: DictionaryEntry[];
+  dictionary: Omit<DictionaryEntry, "embedding">[];
   history: ChatMessage[];
   previous_analysis?: Analysis;
 }
