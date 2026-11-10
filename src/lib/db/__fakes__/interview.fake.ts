@@ -21,6 +21,10 @@ export class FakeInterviewRepository implements InterviewRepository {
   async appendMessage(_owner: string, _id: string, message: ChatMessage & { audio_url?: string | null }) {
     const id = `message-${this.messages.length + 1}`; this.messages.push({ ...message, id }); return id;
   }
+  async updateMessageAudio(_owner: string, _id: string, messageId: string, audioUrl: string) {
+    const message = this.messages.find(m => m.id === messageId);
+    if (message) message.audio_url = audioUrl;
+  }
   async addCase(_owner: string, item: SensoryCase) { this.cases.push(item); this.confirmedCount++; }
   async countConfirmed() { return this.confirmedCount; }
   quote: string | null = null;

@@ -60,6 +60,13 @@ export class SupabaseInterviewRepository implements InterviewRepository {
     const { data, error } = await this.db.rpc("s04_append_message", { p_owner: owner, p_recipe: id, p_role: m.role, p_content: m.content, p_image: m.image_url ?? null, p_audio: m.audio_url ?? null });
     check(error); return z.string().parse(data);
   }
+  async updateMessageAudio(owner: string, id: string, messageId: string, audioUrl: string) {
+    await this.requireOwned(owner, id);
+    const { data, error } = await this.db.from("chat_messages").update({ audio_url: audioUrl })
+      .eq("id", messageId).eq("recipe_id", id).eq("role", "assistant").select("id").maybeSingle();
+    check(error);
+    if (!data) throw new Error("CHAT_MESSAGE_NOT_FOUND");
+  }
   async addCase(owner: string, item: SensoryCase) {
     await this.requireOwned(owner, item.recipe_id);
     const { error } = await this.db.from("sensory_cases").upsert({ ...item, transmitter_id: owner, embedding: JSON.stringify(item.embedding) }, { onConflict: "message_id,expression,dimension,context", ignoreDuplicates: true }); check(error);
