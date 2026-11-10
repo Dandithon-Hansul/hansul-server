@@ -16,6 +16,12 @@ describe("ClaudeAdapter", () => {
     expect(result.recipe.food_types).toEqual(["나물"]);
     expect(create.mock.calls[0][0].system[0].cache_control).toEqual({ type: "ephemeral" });
   });
+  it("Markdown 코드 블록으로 감싼 분석 JSON을 처리한다", async () => {
+    const create = vi.fn().mockResolvedValue(reply(`\`\`\`json\n${JSON.stringify(analysisFixture())}\n\`\`\``));
+    const result = await adapter(create).analyzeJson(input);
+    expect(result.recipe.food_types).toEqual(["나물"]);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
   it("형식 오류만 한 번 재시도한다", async () => {
     const create = vi.fn().mockResolvedValueOnce(reply("설명문")).mockResolvedValueOnce(reply(JSON.stringify(analysisFixture())));
     await adapter(create).analyzeJson(input);

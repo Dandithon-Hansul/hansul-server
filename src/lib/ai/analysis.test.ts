@@ -25,8 +25,13 @@ describe("interview analysis contract", () => {
     const input = analysisFixture(); input.questions = [];
     expect(analysisSchema.safeParse(input).success).toBe(true);
   });
+  it("프롬프트의 분석 JSON 예시가 스키마에 맞는다", () => {
+    const example = INTERVIEW_PROMPT.match(/## 9\. 응답 방식[\s\S]*?\n\n(\{[\s\S]*?\n\})\n\n## 10\./)?.[1];
+    expect(example).toBeDefined();
+    expect(analysisSchema.safeParse(JSON.parse(example!)).success).toBe(true);
+  });
   it("프롬프트 전체에 실행 모드만 덧붙인다", () => {
-    expect(createHash("sha256").update(INTERVIEW_PROMPT).digest("hex")).toBe("53a5e26f44e283510a7bc07aa9c9abe418183c0761b08da56485d9a7c29fe771");
+    expect(createHash("sha256").update(INTERVIEW_PROMPT).digest("hex")).toBe("ac9a40708e7702d49039edd2353507c6d544e2976a71029bfacb09830d903930");
     expect(INTERVIEW_PROMPT).toContain("## 3-2. 복합 레시피 분해 규칙");
     expect(INTERVIEW_PROMPT).toContain("핵심 불확실성이 모두 해결되면 질문 없이 구조화 결과를 반환한다.");
     expect(ANALYZE_PROMPT.startsWith(INTERVIEW_PROMPT)).toBe(true);
