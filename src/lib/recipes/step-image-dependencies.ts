@@ -30,7 +30,9 @@ export function stepImageDependencies(): StepImageDependencies {
       return data ? recipeSchema.parse(data) : null;
     },
     async generate(prompt) {
-      const model = z.string().min(1).parse(process.env.IMAGE_MODEL);
+      const configuredModel = process.env.IMAGE_MODEL?.trim();
+      const retiredModels = ["gpt-image-1", "dall-e-2", "dall-e-3"];
+      const model = !configuredModel || retiredModels.includes(configuredModel) ? "gpt-image-1.5" : configuredModel;
       const client = new OpenAI({ timeout: 60_000, maxRetries: 0 });
       const result = await client.images.generate({ model, prompt, output_format: "webp" });
       const image = result.data?.[0]?.b64_json;
