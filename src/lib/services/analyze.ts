@@ -5,6 +5,8 @@ import type { InterviewRepository } from "../db/interview";
 import { InterviewError } from "./errors";
 import { confirmedAnswers, matchDictionary } from "./sensory";
 
+export const CHAT_CHOICE_PREFIX = "\n\n다음 감각 질문: ";
+
 export async function requireRecipe(repo: InterviewRepository, owner: string, id: string, draft = true) {
   const recipe = await repo.getRecipe(owner, id);
   if (!recipe) throw new InterviewError(404, "NOT_FOUND", "레시피를 찾을 수 없습니다");
@@ -25,7 +27,7 @@ export function analysisDto(a: Analysis) {
     auto_applied: a.auto_applied.map(e => ({ expression: e.expression, applied_value: e.applied_value })),
   };
 }
-export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, embedding: EmbeddingPort, owner: string, id: string) {
+export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, embedding: EmbeddingPort, owner: string, id: string, expectedMessageId?: string) {
   const started = performance.now();
   const recipe = await requireRecipe(repo, owner, id);
   if (!recipe.transcript?.trim()) throw new InterviewError(422, "TRANSCRIPT_REQUIRED", "먼저 녹음 또는 텍스트를 저장해 주세요");
@@ -36,6 +38,9 @@ export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, e
     repo.listDictionary(owner),
     repo.getAnalysis(owner, id),
   ]);
+  if (expectedMessageId && history.at(-1)?.id !== expectedMessageId) {
+    throw new InterviewError(409, "STALE_ANALYSIS", "새 대화가 있어 최신 답변을 기준으로 분석합니다");
+  }
   const lookup_ms = Math.round(performance.now() - lookupStarted);
   const aiStarted = performance.now();
   const modelDictionary = dictionary.map(({ id, expression, dimension, context, food_name, resolved_value, confidence, confirmations }) =>
@@ -69,9 +74,13 @@ export async function analyzeRecipe(repo: InterviewRepository, ai: ClaudePort, e
   const postprocess_ms = Math.round(performance.now() - postprocessStarted);
   const saveStarted = performance.now();
   await repo.saveAnalysis(owner, id, a, history.at(-1)?.id ?? null);
-  const answer = history.findLast(message => message.role === "user");
+  const answerIndex = history.findLastIndex(message => message.role === "user");
+  const answer = history[answerIndex];
   if (answer) {
-    const terms = confirmedAnswers(a, previous ?? undefined, answer.content);
+    const preceding = history[answerIndex - 1];
+    // The displayed chat question takes precedence over a previous full analysis.
+    const answeredChatChoice = preceding?.role === "assistant" && preceding.content.includes(CHAT_CHOICE_PREFIX);
+    const terms = confirmedAnswers(a, answeredChatChoice ? undefined : previous ?? undefined, answer.content);
     try {
       await Promise.all(terms.map(async term => {
         const repeated = dictionary.some(entry => entry.expression === term.expression &&

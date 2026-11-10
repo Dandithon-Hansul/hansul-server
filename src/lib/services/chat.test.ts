@@ -207,3 +207,39 @@ describe("chatRecipe", () => {
     expect(frames.at(-1)).toContain("event: done");
   });
 });
+
+it("전체 분석 전에 선택지를 보내고 다음 답변과 함께 분석한다", async () => {
+  const repo = new FakeInterviewRepository();
+  const ai = new FakeClaude();
+  const current = analysisFixture();
+  Object.assign(current.detected_sensory_terms[0], {
+    expression: "농도", source: "user_answer", needs_confirmation: false, interpreted_value: "되직하게",
+  });
+  const full = vi.spyOn(ai, "analyzeJson").mockResolvedValueOnce(analysisFixture()).mockResolvedValueOnce(current);
+  const stream = vi.spyOn(ai, "chatStream");
+  stream.mockResolvedValueOnce("이야기를 잘 들었어요.");
+  stream.mockResolvedValueOnce('{"question":"농도는 어느 정도인가요?","options":["묽게","되직하게"]}');
+  stream.mockResolvedValueOnce("확인했어요.");
+  stream.mockResolvedValueOnce("null");
+  const frames: string[] = [];
+  const jobs: Array<() => Promise<void>> = [];
+  const send = (message: string) => chatRecipe(repo, ai, new FakeTts(), new FakeEmbedding(), "owner",
+    { recipe_id: "recipe", message, tts: false }, frame => frames.push(frame), undefined, job => jobs.push(job));
+
+  await send("국물을 졸여요.");
+  expect(frames.find(frame => frame.startsWith("event: choices"))).toContain("되직하게");
+  expect(full).not.toHaveBeenCalled();
+  expect(jobs).toHaveLength(1);
+  await jobs.shift()!();
+  expect(full).toHaveBeenCalledTimes(1);
+
+  await send("되직하게");
+  expect(jobs).toHaveLength(1);
+  await jobs.shift()!();
+  expect(full).toHaveBeenCalledTimes(2);
+  expect(repo.cases).toEqual([expect.objectContaining({ message_id: "message-3", resolved_value: "되직하게" })]);
+  expect(full).toHaveBeenNthCalledWith(2, expect.objectContaining({ history: expect.arrayContaining([
+    expect.objectContaining({ role: "assistant", content: expect.stringContaining("농도는 어느 정도인가요?") }),
+    expect.objectContaining({ role: "user", content: "되직하게" }),
+  ]) }));
+});
